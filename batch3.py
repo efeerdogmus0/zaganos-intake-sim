@@ -8,7 +8,8 @@ W = None
 def init():
     global W
     import sim3
-    W = sim3.World('region2.npz')
+    import os
+    W = sim3.World(os.environ.get('REGION', 'region2.npz'))
 
 SINGLES = (-0.15, -0.12, -0.09, -0.06, -0.03, 0.0, 0.03, 0.06, 0.09, 0.12, 0.15)
 MULTI = {

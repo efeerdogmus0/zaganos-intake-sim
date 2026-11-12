@@ -225,6 +225,8 @@ class World:
         self.D = dict(D)
         gi = self.groups[0]
         lay = D.get('layout', 'CAD')
+        if lay == 'native':     # CAD dosyasindaki tekerlekler oldugu gibi
+            lay = [(float(cc[2] - gi.c[2]), 'B' if 'Bootleg' in nm else 'G') for cc, rc, h, mu, nm in gi.cyls]
         lay = LAYOUTS[lay] if isinstance(lay, str) else [tuple(w) for w in lay]
         mecz = list(D.get('mecz', ())) + ([MEC2_Z, -MEC2_Z] if D.get('mec2') else [])
         def clear(z, k):

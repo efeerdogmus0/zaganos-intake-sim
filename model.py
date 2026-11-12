@@ -102,9 +102,13 @@ def build(region_path):
         g = Group(nm, c, a, P['feeder'], sgn, 1.5e-5, tau_1150 * 16 / 30, w_1150 * 30 / 16)
         groups.append(g); gf[nm] = g
     # --- shooter
-    c, a = shaft('ShooterShaft')
-    gs = Group('flywheel', c, a, P['flywheel'], -1, 2.5e-4, 2 * tau_6000 * 2.42 * 0.7, w_6000 / 2.42)
-    groups.append(gs)
+    # shooter (taretsiz export'larda yok: o zaman yalniz intake + feeder)
+    gs = None
+    if 'ShooterShaft' in by:
+        c, a = shaft('ShooterShaft')
+        gs = Group('flywheel', c, a, P['flywheel'], -1, 2.5e-4, 2 * tau_6000 * 2.42 * 0.7, w_6000 / 2.42)
+        groups.append(gs)
+    non_fly = [g for g in groups if g is not gs]
 
     def nearest_group(v, cands, maxd=0.03):
         cen = v.mean(0)
@@ -119,6 +123,8 @@ def build(region_path):
     sushi = []
     for n, (v, f) in by.items():
         if not ROT_PAT.search(n):
+            continue
+        if gs is None and re.search(r'Sushi|HoodTeker|TekerSağ|TekerSol|Rhino', n):
             continue
         if 'Sushi' in n:
             sushi.append((n, v))
@@ -139,13 +145,13 @@ def build(region_path):
             rad = np.linalg.norm((v - c0) - np.outer(t, ax), axis=1)
             g.rollers.append((c0, ax, float(np.percentile(rad, 99)), float((t.max() - t.min()) / 2)))
             used.add(n); g.parts.append(n); continue
-        g = nearest_group(v, groups[:-1], 0.012)
+        g = nearest_group(v, non_fly, 0.012)
         if g is None:
             continue
         g.parts.append(n)
-        if len(f) < 1000:               # gecko gobek parcasi, tekerlek icinde
-            used.add(n); continue
         cc, r, h = cyl_fit(v, g.c, g.a)
+        if r < 0.012:                   # gobek parcasi, tekerlek icinde (ucgen sayisina bakma: dosya bicimine gore degisiyor)
+            used.add(n); continue
         g.cyls.append((cc, r, h, MU_WHEEL, n)); used.add(n)
 
     # sushi hood makaralari: shooter miline paralel, her biri kendi grubunda.
@@ -174,8 +180,15 @@ def build(region_path):
             g.cyls.append((cc, r, h, MU_WHEEL, n))
         groups.append(g)
     sg = [g for g in groups if g.name.startswith('sushi')]
+    # taret donukse flywheel ile hood yer degistirir: flywheel'in hood'a bakan yuzu yukari donmeli
+    if sg:
+        hx = np.mean([g.c[0] for g in sg]) - gs.c[0]
+        sgn = -1.0 if hx < 0 else 1.0
+        gs.target = sgn * abs(gs.target); gs.w = gs.target
+        for g in sg:
+            g.target = -sgn * abs(g.target); g.w = g.target
     for n, (v, f) in by.items():
-        if 'Sushi' in n:
+        if 'Sushi' in n and sg:
             min(sg, key=lambda g: abs(g.c[1] - v.mean(0)[1])).parts.append(n)
 
     # intake milinin tekerlek zarfi icinde kalan her sey (mil, gobek, makara cekirdegi, tasiyici,

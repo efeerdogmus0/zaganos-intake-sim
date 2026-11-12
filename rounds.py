@@ -154,3 +154,75 @@ def round4():
     return J
 
 ROUNDS['r4'] = round4
+
+
+# ---------------------------------------------------------------- yeni CAD (12.11.2026 RobotMontaj.glb), oldugu gibi
+NATIVE = dict(layout='native', mec='cad')
+
+def round_new():
+    J = []
+    SC = scenes()
+    p = dict(c_rr=RR, mu_boot=0.15)
+    did = 'YENI CAD oldugu gibi@b0.15'
+    J += suite(did, NATIVE, p, seed=1, multi=MULTI2)
+    J += suite(did, NATIVE, p, seed=2, singles=(), multi=MULTI2)
+    for i, balls in enumerate(SC):
+        J.append(dict(id=f'{did}|rnd{i:02d}', did=did, D=NATIVE, p=p, test=f'rnd{i:02d}', balls=balls, v=0.5, t_max=4.0,
+                      seed=100 + i))
+    return J
+
+ROUNDS['new'] = round_new
+
+def round_new_s2():
+    # ayni 60 rastgele sahne, ikinci tohum (gurultu olcumu)
+    SC = scenes(); p = dict(c_rr=RR, mu_boot=0.15); did = 'YENI CAD oldugu gibi@b0.15'
+    return [dict(id=f'{did}|rnd{i:02d}|s2', did=did, D=NATIVE, p=p, test=f'rnd{i:02d}', balls=balls, v=0.5, t_max=4.0,
+                 seed=300 + i) for i, balls in enumerate(SC)]
+
+ROUNDS['new_s2'] = round_new_s2
+
+# ---------------------------------------------------------------- kanal agzi taramasi (ChassisYarim tabanli)
+# tekerler/mecanumlar CAD'deki gibi; huni duvarinin on kismi (x -147.5 .. -72.5 mm) parametrik
+XK, WM, WC = S.X_KEEP, S.Z_PLATE, S.CHAN
+def prof(f, wm=WM, n=8, x1=XK):
+    """yari genislik profili: t=0 agiz (wm) -> t=1 kanal (WC); f(t) 0->1 daralma orani"""
+    pts = []
+    for i in range(n + 1):
+        t = i / n; x = XM + (x1 - XM) * t
+        pts.append((round(x, 5), round(wm - (wm - WC) * f(t), 5)))
+    if x1 < XK:
+        pts.append((XK, WC))
+    return pts
+LIN = prof(lambda t: t)
+EARLY = prof(lambda t: 1 - (1 - t) ** 2.5)
+LATE = prof(lambda t: t ** 2.5)
+SCURVE = prof(lambda t: t * t * (3 - 2 * t))
+SHORT = prof(lambda t: t, x1=-0.110)
+NARROW = prof(lambda t: t, wm=0.055)
+KANAL = {
+    'K00 CAD oldugu gibi (ChassisYarim)': {},
+    'K01 duz konik (agiz 83)': dict(funnel=dict(neg=LIN, pos=LIN)),
+    'K02 erken daralan': dict(funnel=dict(neg=EARLY, pos=EARLY)),
+    'K03 gec daralan': dict(funnel=dict(neg=LATE, pos=LATE)),
+    'K04 S profil': dict(funnel=dict(neg=SCURVE, pos=SCURVE)),
+    'K05 kademeli (Boot erken, Gecko gec)': dict(funnel=dict(neg=EARLY, pos=LATE)),
+    'K06 kademeli (Boot gec, Gecko erken)': dict(funnel=dict(neg=LATE, pos=EARLY)),
+    'K07 tek tarafli (Boot duz duvar)': dict(funnel=dict(neg=STRAIGHT, pos=LIN)),
+    'K08 tek tarafli (Gecko duz duvar)': dict(funnel=dict(neg=LIN, pos=STRAIGHT)),
+    'K09 dar agiz tek sira (55)': dict(funnel=dict(neg=NARROW, pos=NARROW)),
+    'K10 kisa dik huni': dict(funnel=dict(neg=SHORT, pos=SHORT)),
+    'K11 CAD sekli duz duvar': dict(funnel=SMOOTH),
+    'K12 duz konik + huni tabani rampa': dict(funnel=dict(neg=LIN, pos=LIN), ramp='fun'),
+    'K13 duz konik + V oluk rampa': dict(funnel=dict(neg=LIN, pos=LIN), ramp='vee'),
+}
+def round_kanal(seed2=False):
+    J = []; SC = scenes(); p = dict(c_rr=RR, mu_boot=0.15)
+    for name, extra in KANAL.items():
+        D = dict(NATIVE); D.update(extra); did = f'{name}@b0.15'
+        if not seed2:
+            J += suite(did, D, p, seed=1, multi=MULTI2)
+        for i, balls in enumerate(SC):
+            J.append(dict(id=f'{did}|rnd{i:02d}' + ('|s2' if seed2 else ''), did=did, D=D, p=p, test=f'rnd{i:02d}',
+                          balls=balls, v=0.5, t_max=4.0, seed=(300 if seed2 else 100) + i))
+    return J
+ROUNDS['kanal'] = round_kanal

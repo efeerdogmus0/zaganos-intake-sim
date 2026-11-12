@@ -10,6 +10,10 @@ on:
         description: 'Parca sayisi (en fazla 20)'
         required: true
         default: '20'
+      region:
+        description: 'Bolge dosyasi (region2.npz = 11.11 STEP, region2_new.npz = 12.11 GLB, region2_v4.npz = ChassisYarim)'
+        required: true
+        default: region2.npz
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -33,7 +37,7 @@ jobs:
           python-version: '3.13'
           cache: pip
       - run: pip install -r requirements.txt
-      - run: SHARD=${{ matrix.i }}/${{ inputs.shards }} python batch3.py ${{ inputs.round }} out.jsonl
+      - run: REGION=${{ inputs.region }} SHARD=${{ matrix.i }}/${{ inputs.shards }} python batch3.py ${{ inputs.round }} out.jsonl
       - uses: actions/upload-artifact@v4
         with:
           name: part-${{ matrix.i }}
