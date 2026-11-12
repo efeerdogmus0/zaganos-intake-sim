@@ -1,0 +1,73 @@
+name: video
+on:
+  workflow_dispatch:
+    inputs:
+      scenes:
+        description: 'Bosluklu liste, tasarim:sahne (record3.py), orn. K00:c1 K14:rnd31'
+        required: true
+        default: 'K00:c1 K14:c1 K00:rnd31 K14:rnd31'
+      region:
+        description: 'Bolge dosyasi'
+        required: true
+        default: region2_v4.npz
+      assemble:
+        description: 'Montaj betigi'
+        required: true
+        default: assemble_kanal.py
+      out:
+        description: 'Video adi'
+        required: true
+        default: kanal.mp4
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      list: ${{ steps.m.outputs.list }}
+    steps:
+      - id: m
+        run: echo "list=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1].split()))" '${{ inputs.scenes }}')" >> $GITHUB_OUTPUT
+  render:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        s: ${{ fromJson(needs.plan.outputs.list) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: kayit
+        run: |
+          S='${{ matrix.s }}'; D=${S%%:*}; T=${S#*:}
+          echo "TAG=${D}_${T}" >> $GITHUB_ENV
+          REGION=${{ inputs.region }} python record3.py rec.npz $D $T
+      - run: bash ci/get_blender.sh
+      - name: render
+        run: RENDER_ENGINE=CYCLES blender -b --factory-startup --python render3.py -- "$PWD" "$PWD/rec.npz" "$PWD/vid/$TAG/f" 4 100 top 2>&1 | grep -E "BITTI|Error|Traceback|Blender [0-9]" 
+      - run: ls vid/$TAG | wc -l
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vid-${{ env.TAG }}
+          path: vid
+  assemble:
+    needs: render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: vid-*
+          path: vid
+          merge-multiple: true
+      - run: ls vid
+      - run: bash ci/get_blender.sh
+      - run: blender -b --factory-startup --python ${{ inputs.assemble }} -- "$PWD" "$PWD/${{ inputs.out }}" 2>&1 | grep -E "VIDEO|Error|Traceback"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video
+          path: ${{ inputs.out }}

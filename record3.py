@@ -13,7 +13,12 @@ CAND = {'REF': (rounds.REFS['REF CAD oldugu gibi'][0], dict(c_rr=rounds.RR, mu_b
 if __name__ == '__main__':
     out, dn, tn = sys.argv[1:4]
     io = (sys.argv[4] != '0') if len(sys.argv) > 4 else True
-    D, p = CAND[dn]
+    if dn in CAND:
+        D, p = CAND[dn]
+    else:                                   # rounds.KANAL / KANAL2 tasarimi, ad on eki ile (orn. K14)
+        allk = dict(rounds.KANAL); allk.update(getattr(rounds, 'KANAL2', {}))
+        name = next(k for k in allk if k.split(' ')[0] == dn)
+        D = dict(rounds.NATIVE); D.update(allk[name]); p = dict(c_rr=rounds.RR, mu_boot=0.15)
     if tn.startswith('rnd'):
         balls = rounds.scenes()[int(tn[3:])]; seed = 100 + int(tn[3:])
     elif tn.startswith('tek'):
