@@ -2,12 +2,19 @@ name: sweep
 on:
   workflow_dispatch:
     inputs:
-      round: {description: 'Tur (rounds.py ROUNDS anahtari, orn. r4)', required: true, default: r4}
-      shards: {description: 'Parca sayisi (en fazla 20)', required: true, default: '20'}
+      round:
+        description: 'Tur (rounds.py ROUNDS anahtari, orn. r4)'
+        required: true
+        default: r4
+      shards:
+        description: 'Parca sayisi (en fazla 20)'
+        required: true
+        default: '20'
 jobs:
   plan:
     runs-on: ubuntu-latest
-    outputs: {idx: ${{ steps.m.outputs.idx }}}
+    outputs:
+      idx: ${{ steps.m.outputs.idx }}
     steps:
       - id: m
         run: echo "idx=$(python3 -c "print(list(range(${{ inputs.shards }})))")" >> $GITHUB_OUTPUT
@@ -17,15 +24,20 @@ jobs:
     timeout-minutes: 350
     strategy:
       fail-fast: false
-      matrix: {i: '${{ fromJson(needs.plan.outputs.idx) }}'}
+      matrix:
+        i: ${{ fromJson(needs.plan.outputs.idx) }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
-        with: {python-version: '3.13', cache: pip}
+        with:
+          python-version: '3.13'
+          cache: pip
       - run: pip install -r requirements.txt
       - run: SHARD=${{ matrix.i }}/${{ inputs.shards }} python batch3.py ${{ inputs.round }} out.jsonl
       - uses: actions/upload-artifact@v4
-        with: {name: 'part-${{ matrix.i }}', path: out.jsonl}
+        with:
+          name: part-${{ matrix.i }}
+          path: out.jsonl
   merge:
     needs: run
     if: always()
@@ -33,11 +45,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
-        with: {path: parts}
+        with:
+          path: parts
       - run: |
           cat parts/*/out.jsonl > ${{ inputs.round }}.jsonl
           wc -l ${{ inputs.round }}.jsonl
           python analyze_r3.py ${{ inputs.round }}.jsonl | tee ozet.txt
           cat ozet.txt >> $GITHUB_STEP_SUMMARY
       - uses: actions/upload-artifact@v4
-        with: {name: '${{ inputs.round }}-sonuc', path: "${{ inputs.round }}.jsonl\nozet.txt"}
+        with:
+          name: ${{ inputs.round }}-sonuc
+          path: |
+            ${{ inputs.round }}.jsonl
+            ozet.txt
