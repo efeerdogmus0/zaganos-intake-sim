@@ -18,6 +18,14 @@ on:
         description: 'Video adi'
         required: true
         default: kanal.mp4
+      chunks:
+        description: 'Sahne basina paralel dilim'
+        required: true
+        default: '5'
+      samples:
+        description: 'Cycles ornek sayisi'
+        required: true
+        default: '8'
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -25,7 +33,7 @@ jobs:
       list: ${{ steps.m.outputs.list }}
     steps:
       - id: m
-        run: echo "list=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1].split()))" '${{ inputs.scenes }}')" >> $GITHUB_OUTPUT
+        run: echo "list=$(python3 -c "import json,sys; n=int(sys.argv[2]); print(json.dumps([f'{s}:{k}/{n}' for s in sys.argv[1].split() for k in range(n)]))" '${{ inputs.scenes }}' '${{ inputs.chunks }}')" >> $GITHUB_OUTPUT
   render:
     needs: plan
     runs-on: ubuntu-latest
@@ -43,16 +51,16 @@ jobs:
       - run: pip install -r requirements.txt
       - name: kayit
         run: |
-          S='${{ matrix.s }}'; D=${S%%:*}; T=${S#*:}
-          echo "TAG=${D}_${T}" >> $GITHUB_ENV
+          S='${{ matrix.s }}'; D=${S%%:*}; R=${S#*:}; T=${R%%:*}; C=${R#*:}
+          echo "TAG=${D}_${T}" >> $GITHUB_ENV; echo "CHUNK=$C" >> $GITHUB_ENV; echo "CTAG=${C/\//of}" >> $GITHUB_ENV
           REGION=${{ inputs.region }} python record3.py rec.npz $D $T
       - run: bash ci/get_blender.sh
       - name: render
-        run: RENDER_ENGINE=CYCLES blender -b --factory-startup --python render3.py -- "$PWD" "$PWD/rec.npz" "$PWD/vid/$TAG/f" 4 100 top 2>&1 | grep -E "BITTI|Error|Traceback|Blender [0-9]" 
-      - run: ls vid/$TAG | wc -l
+        run: FRAME_CHUNK=$CHUNK CYCLES_SAMPLES=${{ inputs.samples }} RENDER_ENGINE=CYCLES blender -b --factory-startup --python render3.py -- "$PWD" "$PWD/rec.npz" "$PWD/vid/$TAG/f" 4 100 top 2>&1 | grep -E "KARE|BITTI|Error|Traceback|Blender [0-9]" 
+      - run: ls vid/$TAG | wc -l; ls vid/$TAG | head -2
       - uses: actions/upload-artifact@v4
         with:
-          name: vid-${{ env.TAG }}
+          name: vid-${{ env.TAG }}-${{ env.CTAG }}
           path: vid
   assemble:
     needs: render
