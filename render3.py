@@ -261,6 +261,14 @@ if STILL:
         sc.frame_set(min(fr, nfr)); r.filepath = f'{OUT}{fr:04d}.png'
         bpy.ops.render.render(write_still=True)
 else:
+    ch = os.environ.get('FRAME_CHUNK')          # 'k/n': sahnenin k. dilimi (paralel render)
+    if ch:
+        k, n = map(int, ch.split('/'))
+        a = 1 + (nfr * k) // n; b = (nfr * (k + 1)) // n
+        if b < a:
+            print('BITTI', nfr, 'bos dilim'); sys.exit(0)
+        sc.frame_start, sc.frame_end = a, b
+    print('KARE', sc.frame_start, sc.frame_end, 'toplam', nfr, flush=True)
     r.filepath = OUT
     bpy.ops.render.render(animation=True)
 print('BITTI', nfr)
