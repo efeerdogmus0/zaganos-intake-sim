@@ -226,3 +226,31 @@ def round_kanal(seed2=False):
                           balls=balls, v=0.5, t_max=4.0, seed=(300 if seed2 else 100) + i))
     return J
 ROUNDS['kanal'] = round_kanal
+
+# ---------------------------------------------------------------- kanal 2: tohum 2-3 dogrulama + K03 cevresinde varyantlar
+KANAL2 = {
+    'K14 gec daralan us 1.8': dict(funnel=dict(neg=prof(lambda t: t ** 1.8), pos=prof(lambda t: t ** 1.8))),
+    'K15 gec daralan us 3.5': dict(funnel=dict(neg=prof(lambda t: t ** 3.5), pos=prof(lambda t: t ** 3.5))),
+    'K16 gec daralan us 5': dict(funnel=dict(neg=prof(lambda t: t ** 5), pos=prof(lambda t: t ** 5))),
+    'K17 gec daralan agiz 75': dict(funnel=dict(neg=prof(lambda t: t ** 2.5, wm=0.075), pos=prof(lambda t: t ** 2.5, wm=0.075))),
+    'K18 gec daralan + huni tabani rampa': dict(funnel=dict(neg=LATE, pos=LATE), ramp='fun'),
+    'K19 gec daralan, x=-85te biter': dict(funnel=dict(neg=prof(lambda t: t ** 2.5, x1=-0.085), pos=prof(lambda t: t ** 2.5, x1=-0.085))),
+    'K20 Boot gec, Gecko CAD sekli': dict(funnel=dict(neg=LATE, pos=FUN_POS)),
+    'K21 Boot CAD sekli, Gecko gec': dict(funnel=dict(neg=FUN_NEG, pos=LATE)),
+}
+def round_kanal2():
+    J = []; SC = scenes(); p = dict(c_rr=RR, mu_boot=0.15)
+    def rnd(did, D, sd):
+        return [dict(id=f'{did}|rnd{i:02d}|s{sd}', did=did, D=D, p=p, test=f'rnd{i:02d}', balls=b, v=0.5, t_max=4.0,
+                     seed=100 * (2 * sd - 1) + i) for i, b in enumerate(SC)]
+    for name, extra in KANAL.items():                 # mevcutlar: tohum 2 ve 3
+        D = dict(NATIVE); D.update(extra); did = f'{name}@b0.15'
+        for sd in (2, 3):
+            J += suite(did, D, p, seed=sd, singles=(), multi=MULTI2) + rnd(did, D, sd)
+    for name, extra in KANAL2.items():                # yeniler: tohum 1-3
+        D = dict(NATIVE); D.update(extra); did = f'{name}@b0.15'
+        J += suite(did, D, p, seed=1, multi=MULTI2) + rnd(did, D, 1)
+        for sd in (2, 3):
+            J += suite(did, D, p, seed=sd, singles=(), multi=MULTI2) + rnd(did, D, sd)
+    return J
+ROUNDS['kanal2'] = round_kanal2
