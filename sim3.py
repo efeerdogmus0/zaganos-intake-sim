@@ -7,6 +7,15 @@
 #   ramp   : 'cad' | 'none' | RAMPS anahtari | ramp_tris parametre sozlugu
 # Fizik sim2 ile ayni (delikli POLLEN, profilli serbest donen TPU makara, 2B Coulomb).
 import numpy as np
+
+def _cross(a, b):
+    """np.cross ile ayni islemler, 3'lu vektorlerde numpy ek yuku olmadan."""
+    if type(a) is not np.ndarray or a.dtype != np.float64: a = np.asarray(a, dtype=float)
+    if type(b) is not np.ndarray or b.dtype != np.float64: b = np.asarray(b, dtype=float)
+    if a.shape != (3,) or b.shape != (3,):
+        return np.cross(a, b)
+    a0, a1, a2 = a.tolist(); b0, b1, b2 = b.tolist()
+    return np.array((a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0))
 import model as M
 from sim import closest_on_tris, StaticMesh, rot, qmul
 from sim2 import (R, WALL, HOLE_A, HOLE_AX, COS_A, RIM_N, RIM_C, RIM_S, qrot, cyl_sdf, Profile, ball_I,
@@ -92,10 +101,10 @@ def hole_contact(x, Rm, n0, sdf):
     if HOLE_AX[k] @ d_local < COS_A:
         return None
     h = Rm @ HOLE_AX[k]
-    u = np.cross(h, (1.0, 0.0, 0.0))
+    u = _cross(h, (1.0, 0.0, 0.0))
     if u @ u < 0.01:
-        u = np.cross(h, (0.0, 1.0, 0.0))
-    u /= np.linalg.norm(u); v = np.cross(h, u)
+        u = _cross(h, (0.0, 1.0, 0.0))
+    u /= np.linalg.norm(u); v = _cross(h, u)
     X = x + R * COS_A * h + HOLE_A * (np.outer(RIM_C, u) + np.outer(RIM_S, v))
     phi, q, n = sdf(X)
     pen = -phi
@@ -198,7 +207,7 @@ class World:
         """+1: makara topu disari iter (intake yonunde donerken)."""
         gi = self.groups[0]
         rel = c0 - gi.c
-        return np.sign((np.cross((0.0, 0.0, 1.0), rel) @ e) * e[2] * c0[2])
+        return np.sign((_cross((0.0, 0.0, 1.0), rel) @ e) * e[2] * c0[2])
 
     def set_design(self, D):
         """layout: LAYOUTS anahtari ya da [(z, 'G'|'B')]; mec: 'in'|'cad'; mec2: +-7.6 cm ic mecanum;
@@ -340,7 +349,7 @@ class World:
                 n = dv / d
                 cp = x - n * R
                 # diger topun temas noktasindaki yuzey hizi (donusu dahil)
-                cons.append((cp, cp, n, (2 * R - d) / 2, 0.4, o.v + np.cross(o.w, cp - o.x), None, -1, 'diger top', 1.0))
+                cons.append((cp, cp, n, (2 * R - d) / 2, 0.4, o.v + _cross(o.w, cp - o.x), None, -1, 'diger top', 1.0))
         return cons
 
     # ------------------------------------------------------------ calistir
@@ -376,10 +385,10 @@ class World:
                 fn = []
                 acc = M.G.copy()
                 for (x, q, n, dlt, mu, vs, g, ri, lab, ks) in cons:
-                    vsurf = vs if g is None else np.cross(g.w * g.a, q - g.c)
+                    vsurf = vs if g is None else _cross(g.w * g.a, q - g.c)
                     if ri >= 0:
-                        vsurf = vsurf + np.cross(wr[ri] * EW[ri], q - CW[ri])
-                    vrel = b.v + np.cross(b.w, x - b.x) - vsurf
+                        vsurf = vsurf + _cross(wr[ri] * EW[ri], q - CW[ri])
+                    vrel = b.v + _cross(b.w, x - b.x) - vsurf
                     f = ks * normal_force(dlt, -(vrel @ n))
                     fn.append(f)
                     acc += f * n / m
@@ -398,23 +407,23 @@ class World:
                         if fn[i] <= 0:
                             continue
                         r = x - b.x
-                        vsurf = vs if g is None else np.cross(g.w * g.a, q - g.c)
+                        vsurf = vs if g is None else _cross(g.w * g.a, q - g.c)
                         if ri >= 0:
                             ew = EW[ri]; cr = CW[ri]
-                            vsurf = vsurf + np.cross(wr[ri] * ew, q - cr)
-                        u = b.v + np.cross(b.w, r) - vsurf
+                            vsurf = vsurf + _cross(wr[ri] * ew, q - cr)
+                        u = b.v + _cross(b.w, r) - vsurf
                         ut = u - (u @ n) * n
                         s = float(np.sqrt(ut @ ut))
                         if s < 1e-10:
                             continue
                         td = ut / s
-                        rt = np.cross(r, td)
+                        rt = _cross(r, td)
                         K = 1 / m + rt @ rt / Ib
                         if g is not None:
-                            lev = np.cross(q - g.c, td) @ g.a
+                            lev = _cross(q - g.c, td) @ g.a
                             K += lev * lev / g.I
                         if ri >= 0:
-                            levr = np.cross(q - cr, td) @ ew
+                            levr = _cross(q - cr, td) @ ew
                             K += levr * levr / rI
                         Jnew = J[i] - td * (s / K)
                         lim = mu * (mu_s if s < 0.02 else 1.0) * fn[i] * dt
@@ -423,14 +432,14 @@ class World:
                             Jnew *= lim / nJ
                         dJ = Jnew - J[i]; J[i] = Jnew
                         b.v += dJ / m
-                        b.w += np.cross(r, dJ) / Ib
+                        b.w += _cross(r, dJ) / Ib
                         if g is not None:
-                            dL = np.cross(q - g.c, -dJ) @ g.a
+                            dL = _cross(q - g.c, -dJ) @ g.a
                             g.w += dL / g.I
                             if abs(dL) / dt > g.tau_peak:
                                 g.tau_peak = abs(dL) / dt
                         if ri >= 0:
-                            wr[ri] += (np.cross(q - cr, -dJ) @ ew) / rI
+                            wr[ri] += (_cross(q - cr, -dJ) @ ew) / rI
                 for i, c in enumerate(cons):
                     ri = c[7]
                     if ri >= 0:                       # makara pim surtunmesi (yuke bagli)

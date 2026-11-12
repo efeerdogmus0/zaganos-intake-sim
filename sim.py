@@ -5,13 +5,73 @@
 # Zemin robot cercevesinde hareket eder (robot ileri giderken zemin +x yonunde akar).
 import time
 import numpy as np
+
+def _cross(a, b):
+    """np.cross ile ayni islemler, 3'lu vektorlerde numpy ek yuku olmadan."""
+    if type(a) is not np.ndarray or a.dtype != np.float64: a = np.asarray(a, dtype=float)
+    if type(b) is not np.ndarray or b.dtype != np.float64: b = np.asarray(b, dtype=float)
+    if a.shape != (3,) or b.shape != (3,):
+        return np.cross(a, b)
+    a0, a1, a2 = a.tolist(); b0, b1, b2 = b.tolist()
+    return np.array((a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0))
 import model as M
 
 R = M.BALL_R
 STIFF = 1.0
 
 # ------------------------------------------------------------------ geometri yardimcilari
+try:
+    import numba as _nb
+except ImportError:
+    _nb = None
+
+if _nb is not None:
+    @_nb.njit(cache=True)
+    def _closest_nb(p, A, B, C):
+        n = A.shape[0]
+        out = np.empty_like(A)
+        for i in range(n):
+            ab0 = B[i, 0] - A[i, 0]; ab1 = B[i, 1] - A[i, 1]; ab2 = B[i, 2] - A[i, 2]
+            ac0 = C[i, 0] - A[i, 0]; ac1 = C[i, 1] - A[i, 1]; ac2 = C[i, 2] - A[i, 2]
+            ap0 = p[0] - A[i, 0]; ap1 = p[1] - A[i, 1]; ap2 = p[2] - A[i, 2]
+            d1 = ab0 * ap0 + ab1 * ap1 + ab2 * ap2; d2 = ac0 * ap0 + ac1 * ap1 + ac2 * ap2
+            if d1 <= 0 and d2 <= 0:
+                out[i, 0] = A[i, 0]; out[i, 1] = A[i, 1]; out[i, 2] = A[i, 2]; continue
+            bp0 = p[0] - B[i, 0]; bp1 = p[1] - B[i, 1]; bp2 = p[2] - B[i, 2]
+            d3 = ab0 * bp0 + ab1 * bp1 + ab2 * bp2; d4 = ac0 * bp0 + ac1 * bp1 + ac2 * bp2
+            if d3 >= 0 and d4 <= d3:
+                out[i, 0] = B[i, 0]; out[i, 1] = B[i, 1]; out[i, 2] = B[i, 2]; continue
+            vc = d1 * d4 - d3 * d2
+            if vc <= 0 and d1 >= 0 and d3 <= 0:
+                v = d1 / (d1 - d3)
+                out[i, 0] = A[i, 0] + ab0 * v; out[i, 1] = A[i, 1] + ab1 * v; out[i, 2] = A[i, 2] + ab2 * v; continue
+            cp0 = p[0] - C[i, 0]; cp1 = p[1] - C[i, 1]; cp2 = p[2] - C[i, 2]
+            d5 = ab0 * cp0 + ab1 * cp1 + ab2 * cp2; d6 = ac0 * cp0 + ac1 * cp1 + ac2 * cp2
+            if d6 >= 0 and d5 <= d6:
+                out[i, 0] = C[i, 0]; out[i, 1] = C[i, 1]; out[i, 2] = C[i, 2]; continue
+            vb = d5 * d2 - d1 * d6
+            if vb <= 0 and d2 >= 0 and d6 <= 0:
+                w = d2 / (d2 - d6)
+                out[i, 0] = A[i, 0] + ac0 * w; out[i, 1] = A[i, 1] + ac1 * w; out[i, 2] = A[i, 2] + ac2 * w; continue
+            va = d3 * d6 - d5 * d4
+            if va <= 0 and (d4 - d3) >= 0 and (d5 - d6) >= 0:
+                w2 = (d4 - d3) / ((d4 - d3) + (d5 - d6))
+                out[i, 0] = B[i, 0] + (C[i, 0] - B[i, 0]) * w2
+                out[i, 1] = B[i, 1] + (C[i, 1] - B[i, 1]) * w2
+                out[i, 2] = B[i, 2] + (C[i, 2] - B[i, 2]) * w2; continue
+            den = 1.0 / (va + vb + vc)
+            v2 = vb * den; w3 = vc * den
+            out[i, 0] = A[i, 0] + ab0 * v2 + ac0 * w3
+            out[i, 1] = A[i, 1] + ab1 * v2 + ac1 * w3
+            out[i, 2] = A[i, 2] + ab2 * v2 + ac2 * w3
+        return out
+
 def closest_on_tris(p, A, B, C):
+    if _nb is not None and A.dtype == B.dtype == C.dtype and A.dtype in (np.float32, np.float64):
+        return _closest_nb(np.asarray(p, dtype=np.float64), A, B, C)
+    return _closest_np(p, A, B, C)
+
+def _closest_np(p, A, B, C):
     """p noktasinin her ucgene en yakin noktasi (Ericson, vektorlu)."""
     ab, ac, ap = B - A, C - A, p - A
     d1 = np.einsum('ij,ij->i', ab, ap); d2 = np.einsum('ij,ij->i', ac, ap)
@@ -217,27 +277,27 @@ class World:
                     for cc, rc, h, mu, nm in g.cyls:
                         q, n, d = cyl_contact(b.x, cc, g.a, rc, h)
                         if d < R:
-                            cons.append((q, n, R - d, mu, np.cross(wv, q - g.c), g, None, nm))
+                            cons.append((q, n, R - d, mu, _cross(wv, q - g.c), g, None, nm))
                     if g.rollers:
                         Rm = rot(g.a, g.theta)
                         for c0, ax, rr, hh in g.rollers:
                             cw = g.c + Rm @ (c0 - g.c); aw = Rm @ ax
                             q, n, d = seg_contact(b.x, cw, aw, rr, hh)
                             if d < R:
-                                cons.append((q, n, R - d, M.MU_WHEEL, np.cross(wv, q - g.c), g, aw, 'TPU makara'))
+                                cons.append((q, n, R - d, M.MU_WHEEL, _cross(wv, q - g.c), g, aw, 'TPU makara'))
                 for o in B:
                     if o is b or o.state != 'aktif':
                         continue
                     dv = b.x - o.x; d = np.linalg.norm(dv)
                     if d < 2 * R:
                         n = dv / d
-                        cons.append((b.x - n * R, n, (2 * R - d) / 2, 0.4, o.v + np.cross(o.w, -n * R) * 0, None, None, 'diger top'))
+                        cons.append((b.x - n * R, n, (2 * R - d) / 2, 0.4, o.v + _cross(o.w, -n * R) * 0, None, None, 'diger top'))
                 # normal kuvvetler
                 fn = []
                 acc = M.G.copy()
                 for q, n, dlt, mu, vs, g, ax, lab in cons:
                     r = q - b.x
-                    vrel = b.v + np.cross(b.w, r) - vs
+                    vrel = b.v + _cross(b.w, r) - vs
                     f = normal_force(dlt, -(vrel @ n))
                     fn.append(f)
                     acc += f * n / M.BALL_M
@@ -251,8 +311,8 @@ class World:
                         if fn[i] <= 0:
                             continue
                         r = q - b.x
-                        vs_now = np.cross(g.w * g.a, q - g.c) if g is not None else vs
-                        u = b.v + np.cross(b.w, r) - vs_now
+                        vs_now = _cross(g.w * g.a, q - g.c) if g is not None else vs
+                        u = b.v + _cross(b.w, r) - vs_now
                         ut = u - (u @ n) * n
                         if ax is not None:
                             e = ax - (ax @ n) * n
@@ -267,7 +327,7 @@ class World:
                         tdir = ut / s
                         K = 1 / M.BALL_M + R * R / M.BALL_I
                         if g is not None:
-                            lev = np.cross(q - g.c, tdir) @ g.a
+                            lev = _cross(q - g.c, tdir) @ g.a
                             K += lev * lev / g.I
                         jn = -tdir * s / K
                         Jnew = J[i] + jn
@@ -277,9 +337,9 @@ class World:
                             Jnew *= lim / nJ
                         dJ = Jnew - J[i]; J[i] = Jnew
                         b.v += dJ / M.BALL_M
-                        b.w += np.cross(r, dJ) / M.BALL_I
+                        b.w += _cross(r, dJ) / M.BALL_I
                         if g is not None:
-                            dL = np.cross(q - g.c, -dJ) @ g.a
+                            dL = _cross(q - g.c, -dJ) @ g.a
                             g.w += dL / g.I
                             g.tau_peak = max(g.tau_peak, abs(dL) / dt)
                 # entegrasyon

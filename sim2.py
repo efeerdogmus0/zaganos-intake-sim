@@ -9,6 +9,15 @@
 # TPU makara: CAD'den alinmis fici profili, kendi ekseni etrafinda serbest donus (atalet + pim surtunmesi).
 import time
 import numpy as np
+
+def _cross(a, b):
+    """np.cross ile ayni islemler, 3'lu vektorlerde numpy ek yuku olmadan."""
+    if type(a) is not np.ndarray or a.dtype != np.float64: a = np.asarray(a, dtype=float)
+    if type(b) is not np.ndarray or b.dtype != np.float64: b = np.asarray(b, dtype=float)
+    if a.shape != (3,) or b.shape != (3,):
+        return np.cross(a, b)
+    a0, a1, a2 = a.tolist(); b0, b1, b2 = b.tolist()
+    return np.array((a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0))
 import model as M
 from sim import closest_on_tris, StaticMesh, rot, qmul
 
@@ -113,7 +122,7 @@ class Profile:
 def box_tris(a, b, height, thick):
     """a->b dogrultusunda dikey ince plaka (12 ucgen)."""
     d = b - a; d[1] = 0; L = np.linalg.norm(d); d /= L
-    nrm = np.cross(d, [0, 1.0, 0]) * thick / 2
+    nrm = _cross(d, [0, 1.0, 0]) * thick / 2
     up = np.array([0, height, 0])
     P = [a - nrm, b - nrm, b + nrm, a + nrm]
     V = P + [p + up for p in P]
@@ -209,10 +218,10 @@ class World:
         if HOLE_AX[k] @ d_local < COS_A:
             return None
         h = Rm @ HOLE_AX[k]
-        u = np.cross(h, [1.0, 0, 0]);
+        u = _cross(h, [1.0, 0, 0]);
         if np.linalg.norm(u) < 0.1:
-            u = np.cross(h, [0, 1.0, 0])
-        u /= np.linalg.norm(u); v = np.cross(h, u)
+            u = _cross(h, [0, 1.0, 0])
+        u /= np.linalg.norm(u); v = _cross(h, u)
         X = b.x + R * COS_A * h + HOLE_A * (np.outer(RIM_C, u) + np.outer(RIM_S, v))
         phi, q, n = sdf(X)
         pen = -phi
@@ -321,10 +330,10 @@ class World:
                 acc = M.G.copy()
                 for (x, q, n, dlt, mu, vs, g, ri, lab, ks) in cons:
                     r = x - b.x
-                    vsurf = vs if g is None else np.cross(g.w * g.a, q - g.c)
+                    vsurf = vs if g is None else _cross(g.w * g.a, q - g.c)
                     if ri >= 0:
-                        vsurf = vsurf + np.cross(wr[ri] * (Rg0 @ rset[ri][1]), q - (gs[0].c + Rg0 @ (rset[ri][0] - gs[0].c)))
-                    vrel = b.v + np.cross(b.w, r) - vsurf
+                        vsurf = vsurf + _cross(wr[ri] * (Rg0 @ rset[ri][1]), q - (gs[0].c + Rg0 @ (rset[ri][0] - gs[0].c)))
+                    vrel = b.v + _cross(b.w, r) - vsurf
                     f = ks * normal_force(dlt, -(vrel @ n), P['stiff'])
                     fn.append(f)
                     acc += f * n / m
@@ -338,23 +347,23 @@ class World:
                         if fn[i] <= 0:
                             continue
                         r = x - b.x
-                        vsurf = vs if g is None else np.cross(g.w * g.a, q - g.c)
+                        vsurf = vs if g is None else _cross(g.w * g.a, q - g.c)
                         if ri >= 0:
                             ew = Rg0 @ rset[ri][1]; cr = gs[0].c + Rg0 @ (rset[ri][0] - gs[0].c)
-                            vsurf = vsurf + np.cross(wr[ri] * ew, q - cr)
-                        u = b.v + np.cross(b.w, r) - vsurf
+                            vsurf = vsurf + _cross(wr[ri] * ew, q - cr)
+                        u = b.v + _cross(b.w, r) - vsurf
                         ut = u - (u @ n) * n
                         s = np.linalg.norm(ut)
                         if s < 1e-10:
                             continue
                         td = ut / s
-                        rt = np.cross(r, td)
+                        rt = _cross(r, td)
                         K = 1 / m + rt @ rt / Ib
                         if g is not None:
-                            lev = np.cross(q - g.c, td) @ g.a
+                            lev = _cross(q - g.c, td) @ g.a
                             K += lev * lev / g.I
                         if ri >= 0:
-                            levr = np.cross(q - cr, td) @ ew
+                            levr = _cross(q - cr, td) @ ew
                             K += levr * levr / P['roller_I']
                         mu_eff = mu * (P['mu_static'] if s < 0.02 else 1.0)
                         Jnew = J[i] - td * s / K
@@ -364,13 +373,13 @@ class World:
                             Jnew *= lim / nJ
                         dJ = Jnew - J[i]; J[i] = Jnew
                         b.v += dJ / m
-                        b.w += np.cross(r, dJ) / Ib
+                        b.w += _cross(r, dJ) / Ib
                         if g is not None:
-                            dL = np.cross(q - g.c, -dJ) @ g.a
+                            dL = _cross(q - g.c, -dJ) @ g.a
                             g.w += dL / g.I
                             g.tau_peak = max(g.tau_peak, abs(dL) / dt)
                         if ri >= 0:
-                            wr[ri] += (np.cross(q - cr, -dJ) @ ew) / P['roller_I']
+                            wr[ri] += (_cross(q - cr, -dJ) @ ew) / P['roller_I']
                 # makara pim surtunmesi (yuke bagli Coulomb tork)
                 for i, (x, q, n, dlt, mu, vs, g, ri, lab, ks) in enumerate(cons):
                     if ri >= 0:
