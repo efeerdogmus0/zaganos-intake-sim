@@ -70,8 +70,16 @@ def normal_force(delta, ddot, stiff):
     return max(0.0, f + c * ddot)
 
 # ------------------------------------------------------------------ isaretli mesafe fonksiyonlari
+try:
+    import fastk as _fk
+except ImportError:
+    _fk = None
+
 def cyl_sdf(X, c, a, rc, h):
     """Dolu silindir: isaretli mesafe, yuzeydeki en yakin nokta, disa normal (X: (k,3))."""
+    if _fk is not None:
+        return _fk.cyl_sdf(np.asarray(X, np.float64), np.asarray(c, np.float64), np.asarray(a, np.float64),
+                           float(rc), float(h))
     d = X - c
     t = d @ a
     rv = d - np.outer(t, a)
@@ -99,6 +107,9 @@ class Profile:
         self.t, self.r = np.asarray(t), np.asarray(r)
 
     def sdf(self, X, c, e):
+        if _fk is not None:
+            return _fk.prof_sdf(np.asarray(X, np.float64), np.asarray(c, np.float64), np.asarray(e, np.float64),
+                                self.A, self.B, self.t.astype(np.float64), self.r.astype(np.float64))
         d = X - c
         tx = d @ e
         rv = d - np.outer(tx, e)

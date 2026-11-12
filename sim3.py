@@ -17,6 +17,11 @@ def _cross(a, b):
     a0, a1, a2 = a.tolist(); b0, b1, b2 = b.tolist()
     return np.array((a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0))
 import model as M
+try:
+    import fastk as _fk
+    FAST = True
+except ImportError:
+    FAST = False
 from sim import closest_on_tris, StaticMesh, rot, qmul
 from sim2 import (R, WALL, HOLE_A, HOLE_AX, COS_A, RIM_N, RIM_C, RIM_S, qrot, cyl_sdf, Profile, ball_I,
                   pollen_mass)
@@ -148,6 +153,9 @@ class Mesh(StaticMesh):
         c, t = ent[1], ent[2]
         if t is None:
             return []
+        if FAST:
+            k, oi, oq, on, od = _fk.mesh_hits(np.asarray(p, np.float64), t, R)
+            return [(oq[j].copy(), on[j].copy(), od[j], int(self.part[c[oi[j]]])) for j in range(k)]
         q = closest_on_tris(p, t[:, 0], t[:, 1], t[:, 2])
         dv = p - q
         d = np.sqrt((dv * dv).sum(1))
@@ -354,6 +362,97 @@ class World:
 
     # ------------------------------------------------------------ calistir
     def run(self, balls, robot_v=0.5, t_max=2.5, dt=2e-4, rec_dt=None, intake_only=False, seed=0):
+        """balls: [(x, z, t_cikis)]. Donus: (toplar, kayit). Takilan top engel olarak sahnede kalir;
+        kalan butun toplar stuck_t boyunca 5 mm'den az hareket ettiyse kosu biter."""
+        rng = np.random.default_rng(seed)
+        m = P['mass']; Ib = ball_I(m)
+        B, pending = [], sorted(balls, key=lambda b: b[2])
+        gs = self.groups; gi = gs[0]
+        for g in gs:
+            g.w = g.target; g.theta = 0.0; g.min_w = abs(g.w); g.tau_peak = 0.0
+        wr = np.zeros(len(self.RC0))
+        fv = np.array([robot_v, 0, 0], float) if np.isscalar(robot_v) else np.array(robot_v, float)
+        rec = {'t': [], 'pos': [], 'quat': [], 'theta': []}
+        t, next_rec = 0.0, 0.0
+        rI = P['roller_I']; mu_s = P['mu_static']; crr = P['c_rr']
+        gidx = {id(g): k for k, g in enumerate(gs)}
+        ga = np.array([g.a for g in gs], float); gc = np.array([g.c for g in gs], float)
+        gI = np.array([g.I for g in gs], float)
+        CD = np.asarray(M.CURVE_D, float); CF = np.asarray(M.CURVE_F, float)
+        cdamp = 2 * 0.22 * np.sqrt(3000.0 * P['stiff'] * P['mass'])
+        while t < t_max:
+            while pending and pending[0][2] <= t:
+                x, z, _ = pending.pop(0)
+                q = rng.normal(size=4); q /= np.linalg.norm(q)
+                b = Ball([x, R + M.FLOOR_Y, z], fv.copy(), q); b.t_anchor = t
+                B.append(b)
+            for g in gs:
+                g.w += g.motor_torque() / g.I * dt
+            active = [b for b in B if b.state == 'aktif']
+            if not pending and (not active or all(b.flag for b in active)):
+                break
+            Rg = rot(gi.a, gi.theta)
+            gw = np.array([g.w for g in gs], float); gtau = np.array([g.tau_peak for g in gs], float)
+            CW = gi.c + self.RC0 @ Rg.T; EW = self.RAX @ Rg.T
+            for b in active:
+                cons = self.contacts(b, gs, fv, [o for o in active if o is not b], CW, EW)
+                nc = len(cons)
+                Xc = np.empty((nc, 3)); Qc = np.empty((nc, 3)); Nc = np.empty((nc, 3)); VSc = np.zeros((nc, 3))
+                DLc = np.empty(nc); MUc = np.empty(nc); KSc = np.empty(nc)
+                GIc = np.full(nc, -1, np.int64); RIc = np.empty(nc, np.int64); FLc = np.zeros(nc, np.bool_)
+                for i, (x, q, n, dlt, mu, vs, g, ri, lab, ks) in enumerate(cons):
+                    Xc[i] = x; Qc[i] = q; Nc[i] = n; DLc[i] = dlt; MUc[i] = mu; KSc[i] = ks; RIc[i] = ri
+                    if g is None:
+                        VSc[i] = vs
+                    else:
+                        GIc[i] = gidx[id(g)]
+                    if lab == 'zemin':
+                        FLc[i] = True
+                    b.touch[lab] = b.touch.get(lab, 0) + 1
+                fnc = np.zeros(nc)
+                pk = _fk.solve_ball(b.x, b.v, b.w, Xc, Qc, Nc, DLc, MUc, VSc, GIc, RIc, KSc, FLc,
+                                    gw, ga, gc, gI, gtau, wr, CW, EW, M.G, m, Ib, rI, mu_s, crr, dt,
+                                    CD, CF, P['stiff'], cdamp, P['pin_mu'], P['pin_r'], fnc)
+                if pk > b.peak_f:
+                    b.peak_f = pk
+                for g in gs:
+                    g.w = float(gw[gidx[id(g)]])
+                b.x += b.v * dt
+                wn = float(np.sqrt(b.w @ b.w))
+                if wn > 1e-9:
+                    hq = np.concatenate([[np.cos(wn * dt / 2)], np.sin(wn * dt / 2) * b.w / wn])
+                    b.q = qmul(hq, b.q); b.q /= np.linalg.norm(b.q)
+                # durum
+                dd = b.x - b.anchor
+                if dd @ dd > 2.5e-5:
+                    b.anchor = b.x.copy(); b.t_anchor = t; b.flag = False
+                elif t - b.t_anchor > P['stuck_t'] and b.x[0] > -0.26:
+                    b.flag = True
+                if intake_only and b.x[0] > -0.085 and b.x[1] > R + 0.01:
+                    b.state = 'alindi'; b.t_end = t
+                elif b.x[1] > 0.36 or (b.x[1] > 0.2 and np.hypot(b.x[0] - 0.05, b.x[1] - 0.25) > 0.17):
+                    b.state = 'cikti'; b.t_end = t; b.exit_v = b.v.copy()
+                elif abs(b.x[2]) > 0.30 or b.x[1] < -0.05 or b.x[0] < -0.9:
+                    b.state = 'kacti'; b.t_end = t
+            for k_, g in enumerate(gs):
+                g.w = float(gw[k_]); g.tau_peak = float(gtau[k_])
+            wr *= np.exp(-dt / 0.3)
+            for g in gs:
+                g.theta += g.w * dt
+                if abs(g.w) < g.min_w:
+                    g.min_w = abs(g.w)
+            if rec_dt is not None and t >= next_rec:
+                rec['t'].append(t)
+                rec['pos'].append([b.x.copy() for b in B]); rec['quat'].append([b.q.copy() for b in B])
+                rec['theta'].append([g.theta for g in gs])
+                next_rec += rec_dt
+            t += dt
+        for b in B:
+            if b.state == 'aktif':
+                b.state = 'takildi' if b.flag else 'zaman asimi'; b.t_end = t
+        return B, rec
+
+    def run_ref(self, balls, robot_v=0.5, t_max=2.5, dt=2e-4, rec_dt=None, intake_only=False, seed=0):
         """balls: [(x, z, t_cikis)]. Donus: (toplar, kayit). Takilan top engel olarak sahnede kalir;
         kalan butun toplar stuck_t boyunca 5 mm'den az hareket ettiyse kosu biter."""
         rng = np.random.default_rng(seed)
