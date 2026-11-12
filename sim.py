@@ -106,6 +106,12 @@ def _closest_np(p, A, B, C):
 
 class StaticMesh:
     def __init__(self, tri, part, cell=0.015):
+        # sifir alanli (dejenere) ucgenleri at: GLB donusumu ve cakisik duvar noktalari bunlari uretiyor,
+        # numba'li en yakin nokta hesabinda sifira bolme olur. 1e-10 m^2 = 1e-4 mm^2 alti.
+        t64 = np.asarray(tri, dtype=np.float64)
+        keep = np.linalg.norm(np.cross(t64[:, 1] - t64[:, 0], t64[:, 2] - t64[:, 0]), axis=1) > 2e-10
+        if not keep.all():
+            tri, part = tri[keep], np.asarray(part)[keep]
         self.tri, self.part, self.cell = tri, part, cell
         self.bmin, self.bmax = tri.min(1), tri.max(1)
         lo = np.floor(self.bmin / cell).astype(np.int64)
