@@ -1,0 +1,33 @@
+name: prep
+on:
+  workflow_dispatch:
+    inputs:
+      enc: {description: 'Sifreli STEP (cad/ altinda)', required: true, default: cad/robot7.step.gz.enc}
+      out: {description: 'Uretilecek bolge dosyasi', required: true, default: region2_v7.npz}
+      ref: {description: 'Karsilastirma bolgesi', required: true, default: region2_v4.npz}
+permissions:
+  contents: write
+jobs:
+  prep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install -r requirements.txt cascadio trimesh
+      - name: STEP'i ac
+        env:
+          CAD_KEY: ${{ secrets.CAD_KEY }}
+        run: openssl enc -d -aes-256-cbc -md sha256 -pbkdf2 -iter 100000 -pass env:CAD_KEY -in ${{ inputs.enc }} | gunzip > robot.step && head -c 13 robot.step
+      - run: python prep_step.py robot.step ${{ inputs.out }} ${{ inputs.ref }} 2>&1 | tee prep.txt
+      - run: python model.py ${{ inputs.out }} | grep -v "TPU makara" | tee -a prep.txt
+      - run: (echo '```'; cat prep.txt; echo '```') >> $GITHUB_STEP_SUMMARY
+      - name: bolgeyi repoya ekle
+        run: |
+          git config user.name "github-actions[bot]"; git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add ${{ inputs.out }} && git commit -m "Bolge: ${{ inputs.out }} (${{ inputs.enc }})" && git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: prep
+          path: prep.txt
