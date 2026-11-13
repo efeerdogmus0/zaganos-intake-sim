@@ -1,0 +1,32 @@
+name: optimize
+on:
+  workflow_dispatch:
+    inputs:
+      nbatch: {description: 'Parti sayisi', required: true, default: '15'}
+      batch: {description: 'Parti basina aday', required: true, default: '20'}
+permissions:
+  actions: write
+  contents: read
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      NBATCH: ${{ inputs.nbatch }}
+      BATCH: ${{ inputs.batch }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: pip install optuna==4.5.0
+      - run: python optimize.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: optimizasyon
+          path: |
+            opt.db
+            opt_log.json
+            dogrulama.json
