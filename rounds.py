@@ -74,8 +74,8 @@ SENS = {   # ad: (parametre degisikligi, robot hizi)
 }
 MULTI3 = {k: MULTI2[k] for k in ('c1', 'c2', 'c3', 'c6', 'u1', 'u2', 'b1', 'b2', 'k1')}
 
-def scenes(n=60):
-    rng = random.Random(42); out = []
+def scenes(n=60, rs=42):
+    rng = random.Random(rs); out = []
     while len(out) < n:
         k = rng.choice((2, 3, 3, 4, 5)); pts = []; tries = 0
         while len(pts) < k and tries < 300:
@@ -254,3 +254,37 @@ def round_kanal2():
             J += suite(did, D, p, seed=sd, singles=(), multi=MULTI2) + rnd(did, D, sd)
     return J
 ROUNDS['kanal2'] = round_kanal2
+
+
+# ---------------------------------------------------------------- optimizasyon adaylari (optimize.py -> eval.yml)
+# Sadece Funnel Ittirici on profili degisir (her taraf: agiz yari genisligi, daralma ussu, daralmanin bittigi x).
+# Rampa (AltFunnelPrint), tekerler, mecanumlar, feeder CAD'deki gibi.
+import json, os
+def fun_prof(wm, p, x1):
+    return prof(lambda t: t ** p, wm=wm, x1=x1)
+def cand_design(c):
+    D = dict(NATIVE)
+    if not c.get('cad'):
+        D['funnel'] = dict(neg=fun_prof(c['wm_n'], c['p_n'], c['x1_n']), pos=fun_prof(c['wm_p'], c['p_p'], c['x1_p']))
+    return D
+def dr_params(key, i):
+    """Belirsiz fizik degerleri: her sahne icin rastgele ama tum adaylarda ayni (adil kiyas)."""
+    r = random.Random(7919 * key + i)
+    p = dict(c_rr=RR, mu_boot=r.uniform(0.10, 0.35), mu_tpu=r.uniform(0.45, 0.80), mu_wheel=r.uniform(0.50, 0.80),
+             mass=r.uniform(0.019, 0.025))
+    return p, r.uniform(0.35, 0.70)
+def round_cands():
+    C = json.loads(os.environ['CANDS'])
+    seeds = [int(x) for x in os.environ.get('SEEDS', '1 2').split()]
+    rs = int(os.environ.get('SCENE_SET', '42'))
+    SC = scenes(int(os.environ.get('NSCENE', '60')), rs)
+    J = []
+    for c in C:
+        D = cand_design(c); did = c['name']
+        for sd in seeds:
+            for i, b in enumerate(SC):
+                p, v = dr_params(sd * 100003 + rs, i)
+                J.append(dict(id=f'{did}|rnd{i:02d}|s{sd}', did=did, D=D, p=p, test=f'rnd{i:02d}', balls=b, v=v,
+                              t_max=4.0, seed=rs * 1000 + 100 * sd + i))
+    return J
+ROUNDS['cands'] = round_cands
