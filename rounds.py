@@ -260,12 +260,14 @@ ROUNDS['kanal2'] = round_kanal2
 # Sadece Funnel Ittirici on profili degisir (her taraf: agiz yari genisligi, daralma ussu, daralmanin bittigi x).
 # Rampa (AltFunnelPrint), tekerler, mecanumlar, feeder CAD'deki gibi.
 import json, os
-def fun_prof(wm, p, x1):
-    return prof(lambda t: t ** p, wm=wm, x1=x1)
+def fun_prof(wm, p, x1, q=1.0):
+    # yari genislik = kanal + (agiz - kanal) * (1 - t^p)^q ; q=1 -> eski 'gec daralan' ailesi
+    return prof(lambda t: 1 - (1 - t ** p) ** q, wm=wm, x1=x1, n=12)
 def cand_design(c):
     D = dict(NATIVE)
     if not c.get('cad'):
-        D['funnel'] = dict(neg=fun_prof(c['wm_n'], c['p_n'], c['x1_n']), pos=fun_prof(c['wm_p'], c['p_p'], c['x1_p']))
+        D['funnel'] = {s: fun_prof(c.get(f'wm_{k}', WM), c[f'p_{k}'], c[f'x1_{k}'], c.get(f'q_{k}', 1.0))
+                       for s, k in (('neg', 'n'), ('pos', 'p'))}
     return D
 def dr_params(key, i):
     """Belirsiz fizik degerleri: her sahne icin rastgele ama tum adaylarda ayni (adil kiyas)."""
