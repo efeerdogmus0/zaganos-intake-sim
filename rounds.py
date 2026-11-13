@@ -1,6 +1,7 @@
 # Sonraki tarama turlari (batch3.py bu dosyadan okur)
 from batch3 import suite, SINGLES
 import sim3 as S
+import numpy as np
 
 XM = S.X_MOUTH
 G = lambda *zs: [(z, 'G') for z in zs]
@@ -263,11 +264,50 @@ import json, os
 def fun_prof(wm, p, x1, q=1.0):
     # yari genislik = kanal + (agiz - kanal) * (1 - t^p)^q ; q=1 -> eski 'gec daralan' ailesi
     return prof(lambda t: 1 - (1 - t ** p) ** q, wm=wm, x1=x1, n=12)
+def pchip(X, Y, xs):
+    # monoton kubik (Fritsch-Carlson): kontrol noktalari arasinda tasma/salinim yok
+    X, Y = np.asarray(X, float), np.asarray(Y, float); h = np.diff(X); dl = np.diff(Y) / h
+    m = np.zeros_like(Y)
+    for i in range(1, len(Y) - 1):
+        if dl[i - 1] * dl[i] > 0:
+            w1, w2 = 2 * h[i] + h[i - 1], h[i] + 2 * h[i - 1]
+            m[i] = (w1 + w2) / (w1 / dl[i - 1] + w2 / dl[i])
+    m[0], m[-1] = dl[0], dl[-1]
+    for e in (0, -1):
+        if dl[e] == 0: m[e] = 0.0
+    out = []
+    for x in xs:
+        i = int(np.clip(np.searchsorted(X, x) - 1, 0, len(h) - 1)); t = (x - X[i]) / h[i]
+        h00, h10, h01, h11 = 2*t**3 - 3*t**2 + 1, t**3 - 2*t**2 + t, -2*t**3 + 3*t**2, t**3 - t**2
+        out.append(h00 * Y[i] + h10 * h[i] * m[i] + h01 * Y[i + 1] + h11 * h[i] * m[i + 1])
+    return np.array(out)
+XS5 = [XM + k * (XK - XM) / 6 for k in range(1, 6)]      # 5 kontrol noktasinin x'leri: -135 -122.5 -110 -97.5 -85 mm
+def free_w(fs):
+    # f_i: o noktada kalan daralmanin (onceki yari genislik -> kanal) ne kadari yapiliyor (0..1): monoton daralan egri
+    ws, w = [], WM
+    for f in fs:
+        w = w - f * (w - WC); ws.append(w)
+    xs = np.arange(XM, XK + 1e-9, 0.001)
+    return [[float(x), float(v)] for x, v in zip(xs, pchip([XM] + XS5 + [XK], [WM] + ws + [WC], xs))]
+def fit_f(wfun):
+    # verilen egriyi 5 kontrol noktasina indir (baslangic adaylari icin)
+    fs, w = [], WM
+    for x in XS5:
+        t = wfun(x); f = 0.0 if w - WC < 1e-6 else min(max((w - t) / (w - WC), 0.0), 1.0); fs.append(f); w = w - f * (w - WC)
+    return fs
 def cand_design(c):
     D = dict(NATIVE)
-    if not c.get('cad'):
-        D['funnel'] = {s: fun_prof(c.get(f'wm_{k}', WM), c[f'p_{k}'], c[f'x1_{k}'], c.get(f'q_{k}', 1.0))
-                       for s, k in (('neg', 'n'), ('pos', 'p'))}
+    if c.get('cad'):
+        return D
+    fun = {}
+    for s, k in (('neg', 'n'), ('pos', 'p')):
+        if f'f1_{k}' in c:
+            w = free_w([c[f'f{i}_{k}'] for i in range(1, 6)])
+        else:                                   # eski p/q/x1 ailesi, ayni silüet kuraliyla
+            w = [[float(x), float(v)] for x, v in fun_prof(c.get(f'wm_{k}', WM), c[f'p_{k}'], c[f'x1_{k}'], c.get(f'q_{k}', 1.0))]
+            w = [[float(x), float(np.interp(x, [p[0] for p in w], [p[1] for p in w]))] for x in np.arange(XM, XK + 1e-9, 0.001)]
+        fun[s] = dict(w=w, tilt=float(c.get(f'tilt_{k}', 0.0)))
+    D['funnel'] = fun
     return D
 def dr_params(key, i):
     """Belirsiz fizik degerleri: her sahne icin rastgele ama tum adaylarda ayni (adil kiyas)."""
