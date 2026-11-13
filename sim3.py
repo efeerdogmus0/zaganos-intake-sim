@@ -81,6 +81,38 @@ def ramp_tris(stations, x_front=RAMP_XF, side=0.0, edge=0.0, top=RAMP_TOP, bot=R
 
 X_MOUTH, X_KEEP, Z_PLATE, CHAN = -0.1475, -0.0725, 0.083, 0.0365
 
+_SIL = None
+YC_BALL = 0.0356     # top merkezi yuksekligi (egimin donme ekseni)
+
+def silhouette():
+    """Funnel Ittirici yan silueti (CAD'den, yan_profil.json): [(x, y_alt, y_ust)], x artan."""
+    global _SIL
+    if _SIL is None:
+        import json, os
+        cols = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), 'yan_profil.json')))['cols']
+        _SIL = [(c[0], c[1][0][0], c[1][0][1]) for c in cols]
+    return _SIL
+
+def wall_tris_sil(wfun, sg, tilt_deg=0.0, nband=2):
+    """Funnel Ittirici on duvari, kurallar:
+    - yandan gorunus (giris egimi dahil) CAD/EnicPleyt ile ayni ve sabit: duvar yalniz silhouette() icinde var;
+    - ustten gorunus: ic yuzun yari genisligi wfun(x) (agizda EnicPleyt hizasi, 83 mm);
+    - egik duvar: tilt (derece, + = ust kenar disari / V, - = ust kenar iceri / sarkma), top merkezi yuksekliginde
+      donme; kanal ucunda (X_KEEP) sifira iner, boylece CAD'in arka kismiyla birlesir."""
+    k = np.tan(np.radians(tilt_deg)); T = []
+    def P(x, y):
+        fade = min(max((X_KEEP - x) / (X_KEEP - X_MOUTH), 0.0), 1.0)
+        z = min(max(wfun(x) + k * fade * (y - YC_BALL), 0.020), Z_PLATE)
+        return (x, y, sg * z)
+    sil = silhouette()
+    for (xa, a0, a1), (xb, b0, b1) in zip(sil[:-1], sil[1:]):
+        for s in range(nband):
+            u0, u1 = s / nband, (s + 1) / nband
+            p1 = P(xa, a0 + (a1 - a0) * u0); p2 = P(xb, b0 + (b1 - b0) * u0)
+            p3 = P(xb, b0 + (b1 - b0) * u1); p4 = P(xa, a0 + (a1 - a0) * u1)
+            T.append([p1, p2, p3]); T.append([p1, p3, p4])
+    return np.array(T, dtype=np.float64)
+
 def wall_tris(poly, y0=0.006, y1=0.098):
     """poly [(x, z), ...] boyunca dikey duvar yuzeyi."""
     T = []
@@ -267,6 +299,11 @@ class World:
             cad = self.cad_fun[sg]
             if isinstance(spec, str):
                 t = cad
+            elif isinstance(spec, dict):       # silüet kurali + serbest egri + egik duvar
+                rear = cad[cad[:, :, 0].min(1) > X_KEEP]
+                xw, ww = np.array(spec['w'], dtype=np.float64).T
+                wf = lambda x, xw=xw, ww=ww: float(np.interp(x, xw, ww))
+                t = np.concatenate([rear, wall_tris_sil(wf, sg, float(spec.get('tilt', 0.0)))])
             else:
                 rear = cad[cad[:, :, 0].min(1) > X_KEEP]
                 poly = [(X_MOUTH, sg * Z_PLATE)] + [(x, sg * w) for x, w in spec]
