@@ -2,7 +2,7 @@ name: optimize
 on:
   workflow_dispatch:
     inputs:
-      nbatch: {description: 'Parti sayisi', required: true, default: '15'}
+      nbatch: {description: 'Parti sayisi', required: true, default: '25'}
       batch: {description: 'Parti basina aday', required: true, default: '20'}
       region: {description: 'Bolge', required: true, default: region2_v7.npz}
 permissions:
