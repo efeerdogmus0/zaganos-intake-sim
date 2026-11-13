@@ -13,7 +13,12 @@ CAND = {'REF': (rounds.REFS['REF CAD oldugu gibi'][0], dict(c_rr=rounds.RR, mu_b
 if __name__ == '__main__':
     out, dn, tn = sys.argv[1:4]
     io = (sys.argv[4] != '0') if len(sys.argv) > 4 else True
-    if dn in CAND:
+    import os
+    cj = json.loads(os.environ.get('CANDS') or '[]')     # optimizasyon adaylari (T253 vb.) ve K00_CAD
+    if any(c['name'] == dn for c in cj):
+        c = next(c for c in cj if c['name'] == dn)
+        D = rounds.cand_design(c); p = dict(rounds.PHYS_MED)
+    elif dn in CAND:
         D, p = CAND[dn]
     else:                                   # rounds.KANAL / KANAL2 tasarimi, ad on eki ile (orn. K14)
         allk = dict(rounds.KANAL); allk.update(getattr(rounds, 'KANAL2', {}))
@@ -33,6 +38,10 @@ if __name__ == '__main__':
     W.set_design(D)
     B, rec = W.run(balls, intake_only=io, t_max=4.0, seed=seed, rec_dt=1 / 600)
     print(dn, tn, S.describe(B), 't_son=%.2f' % max(b.t_end for b in B))
+    if os.environ.get('SONUC_OUT'):                       # videodaki sonuc yazisi icin
+        ok = sum(b.state in ('alindi', 'cikti') for b in B)
+        open(os.environ['SONUC_OUT'], 'w').write(f'{ok}/{len(B)} alındı' + ('' if ok == len(B) else
+                                                 f' ({len(B) - ok} top kaldı)'))
     np.savez_compressed(out, t=np.array(rec['t']), pos=np.array(rec['pos'], dtype=object),
                         quat=np.array(rec['quat'], dtype=object), theta=np.array(rec['theta']),
                         names=np.array([g.name for g in W.groups]), R=S.R, D=json.dumps(D),
