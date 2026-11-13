@@ -4,6 +4,7 @@ on:
     inputs:
       nbatch: {description: 'Parti sayisi', required: true, default: '15'}
       batch: {description: 'Parti basina aday', required: true, default: '20'}
+      region: {description: 'Bolge', required: true, default: region2_v7.npz}
 permissions:
   actions: write
   contents: read
@@ -15,6 +16,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       NBATCH: ${{ inputs.nbatch }}
       BATCH: ${{ inputs.batch }}
+      REGION: ${{ inputs.region }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
