@@ -271,9 +271,12 @@ def cand_design(c):
     return D
 def dr_params(key, i):
     """Belirsiz fizik degerleri: her sahne icin rastgele ama tum adaylarda ayni (adil kiyas)."""
+    # Malzemeye gore aralik (olculmedi): Bootleg = goBILDA 3615 Boot-Wheel, 30A silikon kaucuk / asetal gobek;
+    # Gecko 15A/30A; mecanum makara TPU 60A (gobek PLA); duvarlar PLA/aluminyum.
+    # POLLEN: AndyMark am-5851, 2.8 in (71.1 mm), 0.055 lb (24.9 g); magaza varyant agirligi 27 g.
     r = random.Random(7919 * key + i)
-    p = dict(c_rr=RR, mu_boot=r.uniform(0.10, 0.35), mu_tpu=r.uniform(0.45, 0.80), mu_wheel=r.uniform(0.50, 0.80),
-             mass=r.uniform(0.019, 0.025))
+    p = dict(c_rr=RR, mu_boot=r.uniform(0.50, 0.90), mu_tpu=r.uniform(0.50, 0.80), mu_wheel=r.uniform(0.60, 1.00),
+             mu_hard=r.uniform(0.20, 0.40), mass=r.uniform(0.0245, 0.027))
     return p, r.uniform(0.35, 0.70)
 def round_cands():
     C = json.loads(os.environ['CANDS'])
