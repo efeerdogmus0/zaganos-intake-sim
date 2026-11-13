@@ -293,3 +293,6 @@ def round_cands():
                               t_max=4.0, seed=rs * 1000 + 100 * sd + i))
     return J
 ROUNDS['cands'] = round_cands
+
+# Video/tek kayit icin malzeme araliklarinin orta degerleri (olculmedi)
+PHYS_MED = dict(c_rr=RR, mu_boot=0.70, mu_tpu=0.65, mu_wheel=0.80, mu_hard=0.30, mass=0.0257)
