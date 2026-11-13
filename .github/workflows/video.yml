@@ -26,6 +26,10 @@ on:
         description: 'Cycles ornek sayisi'
         required: true
         default: '8'
+      cands:
+        description: 'Optimizasyon adaylari (JSON, istege bagli)'
+        required: false
+        default: ''
 jobs:
   plan:
     runs-on: ubuntu-latest
@@ -53,7 +57,8 @@ jobs:
         run: |
           S='${{ matrix.s }}'; D=${S%%:*}; R=${S#*:}; T=${R%%:*}; C=${R#*:}
           echo "TAG=${D}_${T}" >> $GITHUB_ENV; echo "CHUNK=$C" >> $GITHUB_ENV; echo "CTAG=${C/\//of}" >> $GITHUB_ENV
-          REGION=${{ inputs.region }} python record3.py rec.npz $D $T
+          mkdir -p vid/${D}_${T}
+          CANDS='${{ inputs.cands }}' SONUC_OUT=vid/${D}_${T}/sonuc.txt REGION=${{ inputs.region }} python record3.py rec.npz $D $T
       - run: bash ci/get_blender.sh
       - name: render
         run: FRAME_CHUNK=$CHUNK CYCLES_SAMPLES=${{ inputs.samples }} RENDER_ENGINE=CYCLES blender -b --factory-startup --python render3.py -- "$PWD" "$PWD/rec.npz" "$PWD/vid/$TAG/f" 4 100 top 2>&1 | grep -E "KARE|BITTI|Error|Traceback|Blender [0-9]" 
