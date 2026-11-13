@@ -12,19 +12,14 @@ OK, BAD, INFO = (0.45, 1.0, 0.55), (1.0, 0.38, 0.30), (0.75, 0.85, 1.0)
 
 SCENES = [
     ('vid/K00_tek-0.060', 'ŞU ANKİ CAD | TEK TOP -6 CM (BOOTLEG TARAFI)', 'Huni ağzında takıldı (x = -167 mm)', BAD, '4x yavaş | üstten | koyu: Bootleg, turuncu: Gecko'),
-    ('vid/K00_tek-0.090', 'ŞU ANKİ CAD | TEK TOP -9 CM', 'Huni ağzında takıldı (x = -166 mm)', BAD, '4x yavaş | üstten'),
-    ('vid/K14_tek-0.060', 'K14 GEÇ DARALAN | AYNI TOP -6 CM', 'Alındı (0,37 s)', OK, '4x yavaş | üstten'),
-    ('vid/K07_tek-0.120', 'K07 TEK TARAFLI (BOOTLEG DÜZ DUVAR) | -12 CM', 'Ağızda, mecanumun önünde kaldı', BAD, '4x yavaş | üstten'),
-    ('vid/K08_tek+0.090', 'K08 TEK TARAFLI (GECKO DÜZ DUVAR) | +9 CM', 'Ağızda, mecanumun önünde kaldı', BAD, '4x yavaş | üstten'),
-    ('vid/K09_tek-0.060', 'K09 DAR AĞIZ (55 MM) | -6 CM', 'Ağızda kaldı', BAD, '4x yavaş | üstten'),
-    ('vid/K13_tek-0.090', 'K13 V OLUK RAMPA | -9 CM', 'Huni ağzında takıldı', BAD, '4x yavaş | üstten'),
+    ('vid/K00_tek-0.090', 'ŞU ANKİ CAD | TEK TOP -9 CM (BOOTLEG TARAFI)', 'Huni ağzında takıldı (x = -166 mm)', BAD, '4x yavaş | üstten'),
 ]
 END_LINES = [
-    ('TEK TOP: 22 TASARIM x 11 NOKTA (-15..+15 CM)', 44, INFO),
-    ('Şu anki CAD 9/11: Bootleg tarafında -6 ve -9 cm huni ağzında takılıyor', 28, BAD),
-    ('Tek taraflı ağız: düz duvar tarafında 4 nokta kaçıyor', 28, BAD),
-    ('K14 ve 16 tasarım daha: 11/11', 28, OK),
-    ('Sadece 1 tohum, düz gelen top, robot 0,5 m/s; açılı/hızlı gelen denenmedi', 26, INFO),
+    ('ŞU ANKİ CAD (CHASSISYARIM) | TEK TOP 9/11', 44, INFO),
+    ('-15..+15 cm arası 11 noktadan düz gelen top, robot 0,5 m/s', 28, INFO),
+    ('Kaçan: Bootleg tarafında -6 ve -9 cm, ikisi de huni ağzında takılıyor', 28, BAD),
+    ('Gecko tarafı ve orta: hepsi alındı', 28, OK),
+    ('Sadece 1 tohum; açılı/hızlı gelen top denenmedi', 26, INFO),
     ('Varsayım: top ~21 g, Bootleg tutuşu 0,15; tutuşlar ölçülmedi', 26, (0.7, 0.7, 0.7)),
 ]
 
@@ -69,7 +64,7 @@ f = 1
 # giris
 color('intro_bg', f, f + 75)
 text('intro1', 'ZAĞANOS | KAÇAN TEK TOPLAR', f, f + 75, 66, 0.5, 0.56, (1, 1, 1), align='CENTER', ch=6)
-text('intro2', 'Kanal taramasında tek topu kaçıran senaryolar | gerçek POLLEN', f, f + 75, 34, 0.5, 0.44, INFO,
+text('intro2', 'ChassisYarım olduğu gibi | tek topu kaçırdığı senaryolar | gerçek POLLEN', f, f + 75, 34, 0.5, 0.44, INFO,
      fnt=font2, align='CENTER', ch=7)
 f += 75
 for i, (folder, title, result, col, note) in enumerate(SCENES):
