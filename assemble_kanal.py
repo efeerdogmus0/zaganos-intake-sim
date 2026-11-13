@@ -17,7 +17,7 @@ SCENES = [
     ('vid/K14_rnd31', 'YENİ KANAL K14 | AYNI SAHNE', '5/5 alındı', OK, '4x yavaş | üstten'),
 ]
 END_LINES = [
-    ('22 KANAL GEOMETRİSİ | 5000 SİMÜLASYON | 3 TOHUM', 52, INFO),
+    ('22 KANAL | 4928 SİMÜLASYON | 3 TOHUM', 44, INFO),
     ('En iyi: K14 geç daralan (üs 1,8) %86,8 | şu anki CAD %71,4', 32, OK),
     ('K03 (üs 2,5) %85,3 ve K17 (ağız 75) %86,6 aynı aile, fark gürültü içinde', 30, INFO),
     ('2 top tam yan yana kilitlenmesi çözüldü: 0/2 -> 2/2 (c1, 3 tohum)', 30, OK),
@@ -78,7 +78,7 @@ for i, (folder, title, result, col, note) in enumerate(SCENES):
     n = len(files)
     img.frame_final_duration = n + HOLD          # son kare beklemede
     f1 = f + n + HOLD
-    text(f't{i}', f'{i + 1}. {title}', f, f1, 50, 0.035, 0.92, (1, 1, 1), ch=5, box=True)
+    text(f't{i}', f'{i + 1}. {title}', f, f1, 38, 0.035, 0.92, (1, 1, 1), ch=5, box=True)
     text(f'n{i}', note, f, f1, 26, 0.035, 0.85, (0.75, 0.8, 0.85), fnt=font2, ch=6, box=True)
     text(f'r{i}', result, f + min(n // 2, 45), f1, 42, 0.035, 0.07, col, ch=7, box=True)
     f = f1
