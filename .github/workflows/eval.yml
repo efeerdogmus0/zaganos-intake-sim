@@ -1,0 +1,60 @@
+name: eval
+run-name: eval ${{ inputs.tag }}
+on:
+  workflow_dispatch:
+    inputs:
+      cands: {description: 'Aday listesi (JSON)', required: true}
+      tag: {description: 'Etiket', required: true}
+      seeds: {description: 'Tohumlar', required: true, default: '1 2'}
+      scene_set: {description: 'Sahne seti', required: true, default: '42'}
+      nscene: {description: 'Sahne sayisi', required: true, default: '60'}
+      shards: {description: 'Makine', required: true, default: '19'}
+      region: {description: 'Bolge', required: true, default: region2_v4.npz}
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      idx: ${{ steps.m.outputs.idx }}
+    steps:
+      - id: m
+        run: echo "idx=$(python3 -c "print(list(range(${{ inputs.shards }})))")" >> $GITHUB_OUTPUT
+  run:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        i: ${{ fromJson(needs.plan.outputs.idx) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - env:
+          CANDS: ${{ inputs.cands }}
+          SEEDS: ${{ inputs.seeds }}
+          SCENE_SET: ${{ inputs.scene_set }}
+          NSCENE: ${{ inputs.nscene }}
+          REGION: ${{ inputs.region }}
+          SHARD: ${{ matrix.i }}/${{ inputs.shards }}
+        run: python batch3.py cands out.jsonl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: part-${{ matrix.i }}
+          path: out.jsonl
+  merge:
+    needs: run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: part-*
+          path: parts
+      - run: cat parts/*/out.jsonl > cands.jsonl && wc -l cands.jsonl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eval-${{ inputs.tag }}
+          path: cands.jsonl
