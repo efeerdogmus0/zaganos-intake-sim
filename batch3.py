@@ -2,7 +2,6 @@
 # Her is: (tasarim, belirsiz parametreler, test). Sonuclar satir satir yazilir; yarida kalirsa kaldigi yerden surer.
 import sys, os, json, time, itertools, random
 import numpy as np
-from multiprocessing import Pool
 
 W = None
 def init():
@@ -55,6 +54,67 @@ def run_job(j):
                             v=None if b.exit_v is None else round(float(np.linalg.norm(b.exit_v)), 2),
                             touch=[k for k, _ in sorted(b.touch.items(), key=lambda kv: -kv[1])[:4]]) for b in B])
 
+JOB_TMO = float(os.environ.get('JOB_TMO', '900'))   # tek is icin duvar saati siniri (s)
+
+def fail_rec(j, why):
+    """Coken / takilan is: toplari 'hata' (alinmadi) say, kosuyu durdurma."""
+    return dict(id=j['id'], did=j['did'], test=j['test'], D=j['D'], p=j['p'], seed=j['seed'], v=j['v'], calc=None,
+                err=why, balls=[dict(z=round(float(b[1]), 4), state='hata', t=None, pos=None, v=None, touch=[])
+                                for b in j['balls']])
+
+def _kill(ex):
+    for pr in list(getattr(ex, '_processes', {}).values()):
+        try:
+            pr.kill()
+        except Exception:
+            pass
+    ex.shutdown(wait=False, cancel_futures=True)
+
+def run_all(J, nproc, fh, t0):
+    """Pool yerine: olen isciyi fark eder (BrokenProcessPool), takilan isi zaman asimiyla keser.
+    Cokme aninda ucustaki isler supheli listesine gider; onlar sonda tek tek, ayri iscide denenir."""
+    from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
+    from concurrent.futures.process import BrokenProcessPool
+    queue, suspect, ndone, N = list(J), [], 0, len(J)
+    def emit(r):
+        nonlocal ndone
+        fh.write(json.dumps(r, ensure_ascii=False) + '\n'); fh.flush(); ndone += 1
+        if ndone % 25 == 0 or ndone == N:
+            print(f'[{ndone}/{N}] {time.time() - t0:.0f} s', flush=True)
+    while queue:
+        ex = ProcessPoolExecutor(nproc, initializer=init); fly = {}
+        try:
+            while queue or fly:
+                while queue and len(fly) < nproc:
+                    j = queue.pop(); fly[ex.submit(run_job, j)] = (j, time.time())
+                dn, _ = wait(fly, timeout=10, return_when=FIRST_COMPLETED)
+                for f in dn:
+                    j, _ = fly[f]
+                    if isinstance(f.exception(), BrokenProcessPool):
+                        raise f.exception()
+                    del fly[f]
+                    emit(f.result() if f.exception() is None else fail_rec(j, repr(f.exception())[:200]))
+                late = [f for f, (j, ts) in fly.items() if time.time() - ts > JOB_TMO]
+                if late:
+                    raise TimeoutError
+        except (BrokenProcessPool, TimeoutError) as e:
+            print('isci kaybi/zaman asimi:', type(e).__name__, len(fly), 'is supheli', flush=True)
+            for f, (j, _) in fly.items():
+                if f.done() and f.exception() is None:
+                    emit(f.result())
+                else:
+                    suspect.append(j)
+            _kill(ex); continue
+        ex.shutdown()
+    for j in suspect:                      # tek basina, ayri iscide son deneme
+        ex = ProcessPoolExecutor(1, initializer=init)
+        f = ex.submit(run_job, j)
+        try:
+            emit(f.result(timeout=JOB_TMO)); ex.shutdown()
+        except Exception as e:
+            print('HATA', j['id'], type(e).__name__, flush=True)
+            emit(fail_rec(j, type(e).__name__)); _kill(ex)
+
 if __name__ == '__main__':
     rnd, out = sys.argv[1], sys.argv[2]
     nproc = int(sys.argv[3]) if len(sys.argv) > 3 else os.cpu_count()
@@ -73,9 +133,6 @@ if __name__ == '__main__':
     random.Random(0).shuffle(J)
     print(len(J), 'is,', len(done), 'onceden bitmis', flush=True)
     t0 = time.time()
-    with Pool(nproc, initializer=init) as pool, open(out, 'a') as fh:
-        for i, r in enumerate(pool.imap_unordered(run_job, J), 1):
-            fh.write(json.dumps(r, ensure_ascii=False) + '\n'); fh.flush()
-            if i % 25 == 0 or i == len(J):
-                print(f'[{i}/{len(J)}] {time.time() - t0:.0f} s', flush=True)
+    with open(out, 'a') as fh:
+        run_all(J, nproc, fh, t0)
     print('bitti', round(time.time() - t0), 's', flush=True)
