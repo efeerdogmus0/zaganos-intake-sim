@@ -144,6 +144,11 @@ for sg, key in ((-1, 'neg'), (1, 'pos')):
     spec = fun.get(key, 'cad'); cad = W.cad_fun[sg]
     if isinstance(spec, str):
         add_tris(f'Huni{sg}', cad, MAT['print'])
+    elif isinstance(spec, dict):          # silüet kurali + serbest egri + egik duvar (sim3.set_design ile ayni yuzey)
+        add_tris(f'HuniArka{sg}', cad[cad[:, :, 0].min(1) > S.X_KEEP], MAT['print'])
+        xw, ww = np.array(spec['w'], dtype=np.float64).T
+        wf = lambda x, xw=xw, ww=ww: float(np.interp(x, xw, ww))
+        add_tris(f'HuniYeni{sg}', S.wall_tris_sil(wf, sg, float(spec.get('tilt', 0.0))), MAT['new'], thick=0.004)
     else:
         add_tris(f'HuniArka{sg}', cad[cad[:, :, 0].min(1) > S.X_KEEP], MAT['print'])
         poly = [(S.X_MOUTH, sg * S.Z_PLATE)] + [(x, sg * w) for x, w in spec]
