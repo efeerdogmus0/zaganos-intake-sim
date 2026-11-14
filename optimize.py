@@ -61,7 +61,7 @@ for nb in range(NB):
         cands.append(dict(name='K00_CAD', cad=True))
     res = evaluate(cands, f'b{nb:02d}')
     for t in trials:
-        o, n = res[f'T{t.number:03d}']; study.tell(t, o / n)
+        o, n = res.get(f'T{t.number:03d}', (0, 1)); study.tell(t, o / n)
         log.append(dict(trial=t.number, score=o / n, ok=o, n=n, **t.params))
     if 'K00_CAD' in res:
         o, n = res['K00_CAD']; log.append(dict(trial='K00_CAD', score=o / n, ok=o, n=n))
@@ -79,7 +79,7 @@ cands += [dict(name='CADfit', **BASE['CADfit']), dict(name='T253fit', **BASE['T2
 val = evaluate(cands, 'dogrulama', seeds='4 5 6', scene_set=777, nscene=NSCENE)
 rep = []
 for c in cands:
-    o, n = val[c['name']]
+    o, n = val.get(c['name'], (0, 1))
     tr = next((t.value for t in top if f'T{t.number:03d}' == c['name']), None)
     rep.append(dict(name=c['name'], val=o / n, ok=o, n=n, train=tr, **{k: v for k, v in c.items() if k in SPACE}))
 rep.sort(key=lambda r: -r['val'])
