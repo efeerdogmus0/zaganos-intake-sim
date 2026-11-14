@@ -21,7 +21,7 @@ jobs:
   run:
     needs: plan
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 100
     strategy:
       fail-fast: false
       matrix:
@@ -42,11 +42,13 @@ jobs:
           SHARD: ${{ matrix.i }}/${{ inputs.shards }}
         run: python batch3.py cands out.jsonl
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: part-${{ matrix.i }}
           path: out.jsonl
   merge:
     needs: run
+    if: always()
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
