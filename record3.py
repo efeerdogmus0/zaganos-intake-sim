@@ -24,7 +24,12 @@ if __name__ == '__main__':
         allk = dict(rounds.KANAL); allk.update(getattr(rounds, 'KANAL2', {}))
         name = next(k for k in allk if k.split(' ')[0] == dn)
         D = dict(rounds.NATIVE); D.update(allk[name]); p = dict(c_rr=rounds.RR, mu_boot=0.15)
-    if tn.startswith('rnd'):
+    rv = 0.5
+    if tn.startswith('v') and 's' in tn[1:]:    # dogrulama sahnesi birebir: v55s5 = scenes(100, 777)[55], tohum 5, ayni fizik/hiz
+        i_, sd_ = map(int, tn[1:].split('s'))
+        balls = rounds.scenes(100, 777)[i_]; seed = 777 * 1000 + 100 * sd_ + i_
+        p, rv = rounds.dr_params(sd_ * 100003 + 777, i_)
+    elif tn.startswith('rnd'):
         balls = rounds.scenes()[int(tn[3:])]; seed = 100 + int(tn[3:])
     elif tn.startswith('tek'):
         balls = [(-0.30, float(tn[3:]), 0)]; seed = 1
@@ -36,7 +41,7 @@ if __name__ == '__main__':
     W = S.World(os.environ.get('REGION', 'region2.npz'))
     S.P.clear(); S.P.update(S.P0); S.P.update(p)
     W.set_design(D)
-    B, rec = W.run(balls, intake_only=io, t_max=4.0, seed=seed, rec_dt=1 / 600)
+    B, rec = W.run(balls, robot_v=rv, intake_only=io, t_max=4.0, seed=seed, rec_dt=1 / 600)
     print(dn, tn, S.describe(B), 't_son=%.2f' % max(b.t_end for b in B))
     if os.environ.get('SONUC_OUT'):                       # videodaki sonuc yazisi icin
         ok = sum(b.state in ('alindi', 'cikti') for b in B)
