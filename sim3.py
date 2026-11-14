@@ -434,7 +434,9 @@ class World:
             gw = np.array([g.w for g in gs], float); gtau = np.array([g.tau_peak for g in gs], float)
             CW = gi.c + self.RC0 @ Rg.T; EW = self.RAX @ Rg.T
             for b in active:
-                cons = self.contacts(b, gs, fv, [o for o in active if o is not b], CW, EW)
+                if not (np.isfinite(b.x).all() and np.isfinite(b.v).all() and np.isfinite(b.w).all()):
+                    b.state = 'hata'; b.t_end = t; continue      # sayisal patlama: basarisiz say, cokme
+                cons = self.contacts(b, gs, fv, [o for o in active if o is not b and o.state == 'aktif'], CW, EW)
                 nc = len(cons)
                 Xc = np.empty((nc, 3)); Qc = np.empty((nc, 3)); Nc = np.empty((nc, 3)); VSc = np.zeros((nc, 3))
                 DLc = np.empty(nc); MUc = np.empty(nc); KSc = np.empty(nc)
