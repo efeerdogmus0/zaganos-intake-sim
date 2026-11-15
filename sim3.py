@@ -389,7 +389,7 @@ class World:
             if (bx - c[0]) ** 2 + (by - c[1]) ** 2 + (bz - c[2]) ** 2 > g.rb2:
                 continue
             for cc, rc, h, mu, nm in g.cyls:
-                self._cyl(cons, x, Rm, holes, cc, g.a, rc, h, P['mu_wheel'], g, nm)
+                self._cyl(cons, x, Rm, holes, cc, g.a, rc, h, P['mu_boot'] if 'Bootleg' in nm else P['mu_wheel'], g, nm)
         for o in others:
             dv = x - o.x; d = float(np.sqrt(dv @ dv))
             if d < 2 * R:
