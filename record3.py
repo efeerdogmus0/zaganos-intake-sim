@@ -45,8 +45,10 @@ if __name__ == '__main__':
     print(dn, tn, S.describe(B), 't_son=%.2f' % max(b.t_end for b in B))
     if os.environ.get('SONUC_OUT'):                       # videodaki sonuc yazisi icin
         ok = sum(b.state in ('alindi', 'cikti') for b in B)
+        ts = [b.t_end for b in B if b.state in ('alindi', 'cikti')]
         open(os.environ['SONUC_OUT'], 'w').write(f'{ok}/{len(B)} alındı' + ('' if ok == len(B) else
-                                                 f' ({len(B) - ok} top kaldı)'))
+                                                 f' ({len(B) - ok} top kaldı)') +
+                                                 (f' | son top {max(ts):.2f} s' if ts else ''))
     np.savez_compressed(out, t=np.array(rec['t']), pos=np.array(rec['pos'], dtype=object),
                         quat=np.array(rec['quat'], dtype=object), theta=np.array(rec['theta']),
                         names=np.array([g.name for g in W.groups]), R=S.R, D=json.dumps(D),
