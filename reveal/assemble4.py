@@ -12,7 +12,7 @@ FPS = 30
 END = int(os.environ.get('END_FRAME', '1034'))
 FONT1 = os.environ.get('FONT1', '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf')
 FONT2 = os.environ.get('FONT2', '/usr/share/fonts/truetype/dejavu/DejaVuSansCondensed-Bold.ttf')
-RES = int(os.environ.get('RES', '100'))
+RES = int(os.environ.get('OUT_RES', '100'))   # cikti hep 1080p; kareler dusuk cozunurlukse olceklenir
 ICE, AMBER, RED = (0.55, 0.88, 1.0), (1.0, 0.72, 0.28), (1.0, 0.38, 0.32)
 
 # (numara, metin, baslangic s, bitis s, renk)
@@ -39,7 +39,13 @@ files = sorted(f for f in os.listdir(FR) if f.endswith('.png') and os.path.getsi
 nums = [int(f[1:5]) for f in files]
 missing = sorted(set(range(1, END + 1)) - set(nums))
 print('KARE', len(files), 'EKSIK', len(missing), missing[:20])
-img = strips.new_image('frames', os.path.join(FR, files[0]), channel=1, frame_start=1)
+W0 = bpy.data.images.load(os.path.join(FR, files[0])).size[0]
+try:
+    img = strips.new_image('frames', os.path.join(FR, files[0]), channel=1, frame_start=1, fit_method='FIT')
+except TypeError:
+    img = strips.new_image('frames', os.path.join(FR, files[0]), channel=1, frame_start=1)
+    if W0 and W0 != 1920 and hasattr(img, 'transform'):
+        img.transform.scale_x = img.transform.scale_y = 1920 / W0
 for f in files[1:]:
     img.elements.append(f)
 if hasattr(img, 'frame_final_duration'):
@@ -85,12 +91,12 @@ for i, (num, txt, t0, t1, col) in enumerate(LABELS):
 # giris: karanlik ilk saniyede takim adi, beat'te (kare 43) robotun adi; robot alt %78'de, yazi ustteki bos alanda
 text('i_team', 'Z  A  Ğ  A  N  O  S', 4, 41, 96, 0.5, 0.54, (1, 1, 1), f1o, ch, align='CENTER', fade=7); ch += 1
 text('i_pres', 'P R E S E N T S', 12, 41, 30, 0.5, 0.455, ICE, f2o, ch, align='CENTER', fade=6); ch += 1
-text('i_robot', 'OVERLORD', 43, 117, 170, 0.5, 0.87, (1, 1, 1), f1o, ch, align='CENTER', fade=4); ch += 1
+text('i_robot', 'OVERLORD', 43, 117, 150, 0.5, 0.895, (1, 1, 1), f1o, ch, align='CENTER', fade=4); ch += 1
 
 # final: robot sagda (build4), yazi solda
 t0, t1 = int(30.0 * FPS), END - 2
-text('title', 'OVERLORD', t0, t1, 210, 0.065, 0.56, (1, 1, 1), f1o, ch, fade=12); ch += 1
-text('sub', 'ZAĞANOS   ·   FTC #25577   ·   2026–27', t0 + 10, t1, 50, 0.068, 0.425, ICE, f2o, ch, fade=12); ch += 1
+text('title', 'OVERLORD', t0, t1, 180, 0.055, 0.56, (1, 1, 1), f1o, ch, fade=12); ch += 1
+text('sub', 'ZAĞANOS   ·   FTC #25577   ·   2026–27', t0 + 10, t1, 46, 0.058, 0.44, ICE, f2o, ch, fade=12); ch += 1
 
 def color(name, f0, f1, col, blend, keys, chn):
     try:
