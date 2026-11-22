@@ -66,33 +66,36 @@ def effect(name, kind, ch, f0, f1):
         return strips.new_effect(name, kind, channel=ch, frame_start=f0, frame_end=f1)
 
 def text(name, txt, f0, f1, size, y, col, font, ch):
+    # f1: tamamen kayboldugu kare; 12 karede yumusak cikis
     s = effect(name, 'TEXT', ch, f0, f1)
     s.text = txt; s.font = font; s.font_size = size; s.color = (*col, 1.0); s.location = (0.5, y)
     for attr in ('align_x', 'anchor_x'):
         if hasattr(s, attr): setattr(s, attr, 'CENTER')
     if hasattr(s, 'anchor_y'): s.anchor_y = 'CENTER'
     s.blend_type = 'ALPHA_OVER'
-    alpha_keys(s, ((f0, 0.0), (f0 + 7, 1.0), (f1 - 2, 1.0), (f1, 0.0)))
+    alpha_keys(s, ((f0, 0.0), (f0 + 8, 1.0), (f1 - 12, 1.0), (f1, 0.0)))
     return s
 
-# siyah kart filmin uzerinde; film kare HIT'te (OVERLORD flasi) sert kesme
-card = effect('card', 'COLOR', 3, 1, CUT)
+# kart OVERLORD vurusunun ustunden ~0,4 sn'de filme erir (sert kesme yok)
+card = effect('card', 'COLOR', 3, 1, CUT + 13)
 card.color = (0.008, 0.01, 0.018); card.blend_type = 'ALPHA_OVER'
+alpha_keys(card, ((1, 1.0), (CUT - 2, 1.0), (CUT + 12, 0.0)))
+TXT_OUT = CUT - 4                                # yazilar kart erimeden once kaybolur
 
-text('team', 'Z  A  Ğ  A  N  O  S', 4, CUT, 118, 0.75, (1, 1, 1), f1o, 4)
-text('pres', 'P R E S E N T S', 11, CUT, 38, 0.705, ICE, f2o, 5)
-text('rot1', 'PLEASE ROTATE', 20, CUT, 74, 0.34, (1, 1, 1), f1o, 6)
-text('rot2', 'YOUR PHONE', 23, CUT, 74, 0.30, (1, 1, 1), f1o, 7)
-text('rot3', 'F O R   F U L L   S C R E E N', 28, CUT, 32, 0.255, ICE, f2o, 8)
+text('team', 'Z  A  Ğ  A  N  O  S', 4, TXT_OUT, 118, 0.75, (1, 1, 1), f1o, 4)
+text('pres', 'P R E S E N T S', 11, TXT_OUT, 38, 0.705, ICE, f2o, 5)
+text('rot1', 'PLEASE ROTATE', 20, TXT_OUT, 74, 0.34, (1, 1, 1), f1o, 6)
+text('rot2', 'YOUR PHONE', 23, TXT_OUT, 74, 0.30, (1, 1, 1), f1o, 7)
+text('rot3', 'F O R   F U L L   S C R E E N', 28, TXT_OUT, 32, 0.255, ICE, f2o, 8)
 
 ph = strips.new_image('phone', icon_path, channel=9, frame_start=16)
 if hasattr(ph, 'frame_final_duration'):
-    ph.frame_final_duration = CUT - 16
+    ph.frame_final_duration = TXT_OUT - 16
 ph.blend_type = 'ALPHA_OVER'
 ph.transform.offset_y = 1920 * (0.525 - 0.5)
-alpha_keys(ph, ((16, 0.0), (22, 1.0), (CUT - 2, 1.0), (CUT, 0.0)))
-# saat yonu tersine 90 derece (izleyicinin telefonu cevirecegi yon), iki kez
-for fr, ang in ((24, 0), (38, 90), (52, 90), (58, 0), (64, 0), (78, 90)):
+alpha_keys(ph, ((16, 0.0), (24, 1.0), (TXT_OUT - 12, 1.0), (TXT_OUT, 0.0)))
+# saat yonu tersine 90 derece (izleyicinin telefonu cevirecegi yon): tek, yavas (1 sn), yumusak donus
+for fr, ang in ((28, 0), (58, 90)):
     ph.transform.rotation = math.radians(ang); ph.transform.keyframe_insert('rotation', frame=fr)
 
 if PREVIEW:
