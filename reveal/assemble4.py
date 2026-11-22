@@ -82,10 +82,10 @@ def text(name, txt, f0, f1, size, x, y, col, font, ch, align='LEFT', box=False, 
         s.blend_alpha = a; s.keyframe_insert('blend_alpha', frame=fr)
     return s
 
-ch = 3
+ch = 4
 for i, (num, txt, t0, t1, col) in enumerate(LABELS):
     f0, f1 = int(t0 * FPS), int(t1 * FPS)
-    text(f'n{i}', num, f0, f1, 40, 0.055, 0.155, col, f1o, ch); ch += 1
+    text(f'n{i}', num, f0, f1, 50, 0.055, 0.172, col, f1o, ch); ch += 1
     text(f'l{i}', txt, f0 + 3, f1, 70, 0.055, 0.095, (1, 1, 1), f2o, ch, box=True); ch += 1
 
 # giris: karanlik ilk saniyede takim adi, beat'te (kare 43) robotun adi; robot alt %78'de, yazi ustteki bos alanda
@@ -95,8 +95,8 @@ text('i_robot', 'OVERLORD', 43, 117, 150, 0.5, 0.895, (1, 1, 1), f1o, ch, align=
 
 # final: robot sagda (build4), yazi solda
 t0, t1 = int(30.0 * FPS), END - 2
-text('title', 'OVERLORD', t0, t1, 180, 0.055, 0.56, (1, 1, 1), f1o, ch, fade=12); ch += 1
-text('sub', 'ZAĞANOS   ·   FTC #25577   ·   2026–27', t0 + 10, t1, 46, 0.058, 0.44, ICE, f2o, ch, fade=12); ch += 1
+text('title', 'OVERLORD', t0, t1, 170, 0.055, 0.865, (1, 1, 1), f1o, ch, fade=12); ch += 1
+text('sub', 'ZAĞANOS   ·   FTC #25577   ·   2026–27', t0 + 10, t1, 44, 0.058, 0.765, ICE, f2o, ch, fade=12); ch += 1
 
 def color(name, f0, f1, col, blend, keys, chn):
     try:
@@ -109,6 +109,7 @@ def color(name, f0, f1, col, blend, keys, chn):
 
 for i, (fr, k) in enumerate(FLASHES):
     color(f'flash{i}', fr, fr + 7, (1, 1, 1), 'ADD', ((fr, k), (fr + 2, k * 0.6), (fr + 6, 0.0)), ch); ch += 1
+color('introcard', 1, 45, (0.01, 0.012, 0.02), 'ALPHA_OVER', ((1, 1.0), (38, 1.0), (44, 0.0)), 3)
 color('fadeout', END - 20, END + 1, (0, 0, 0), 'ALPHA_OVER', ((END - 20, 0.0), (END, 1.0)), ch); ch += 1
 
 r = sc.render
