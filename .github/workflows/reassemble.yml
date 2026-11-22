@@ -1,0 +1,40 @@
+name: reveal-reassemble
+on:
+  workflow_dispatch:
+    inputs:
+      run_id: {description: 'Karelerin alinacagi reveal run id', required: true}
+      tag: {description: 'Kare artifact etiketi (rv-<tag>-*)', required: true, default: 'v4'}
+      out: {description: 'Cikti adi', required: true, default: 'v4b'}
+permissions:
+  actions: read
+  contents: read
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rv-${{ inputs.tag }}-*
+          path: fr
+          merge-multiple: true
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ github.token }}
+      - run: ls fr | wc -l
+      - run: bash ci/get_blender.sh
+      - name: sarki + font
+        env:
+          REVEAL_KEY: ${{ secrets.REVEAL_KEY }}
+        run: |
+          curl -sSfL -o song.enc https://github.com/${{ github.repository }}/releases/download/reveal-assets/song.mp3.enc
+          openssl enc -d -aes-256-cbc -md sha256 -pbkdf2 -iter 100000 -pass env:REVEAL_KEY -in song.enc > song.mp3
+          curl -sSfL -o f1.ttf https://github.com/google/fonts/raw/main/ofl/barlowcondensed/BarlowCondensed-ExtraBold.ttf
+          curl -sSfL -o f2.ttf https://github.com/google/fonts/raw/main/ofl/barlowcondensed/BarlowCondensed-SemiBold.ttf
+      - env:
+          FONT1: ${{ github.workspace }}/f1.ttf
+          FONT2: ${{ github.workspace }}/f2.ttf
+        run: blender -b --factory-startup --python reveal/assemble4.py -- "$PWD/fr" "$PWD/song.mp3" "$PWD/ZAGANOS_robot_reveal_${{ inputs.out }}.mp4" 2>&1 | grep -E "KARE|VIDEO|Error|Traceback"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-${{ inputs.out }}
+          path: ZAGANOS_robot_reveal_${{ inputs.out }}.mp4
