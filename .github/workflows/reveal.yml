@@ -1,0 +1,84 @@
+name: reveal
+run-name: reveal ${{ inputs.tag }}
+on:
+  workflow_dispatch:
+    inputs:
+      tag: {description: 'Etiket', required: true, default: 'test'}
+      frames: {description: 'Kareler (1-1034 veya 1,200,350)', required: true, default: '1-1034'}
+      chunks: {description: 'Makine sayisi', required: true, default: '20'}
+      engine: {description: 'EEVEE veya CYCLES', required: true, default: 'EEVEE'}
+      res: {description: 'Cozunurluk yuzdesi (1920x1080 tabani)', required: true, default: '100'}
+      samples: {description: 'Ornek', required: true, default: '64'}
+      assemble: {description: 'Video birlestir (1/0)', required: true, default: '1'}
+      preview: {description: 'Yazi onizleme kareleri (bos = tam video)', required: false, default: ''}
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      idx: ${{ steps.m.outputs.idx }}
+    steps:
+      - id: m
+        run: echo "idx=$(python3 -c "print(list(range(${{ inputs.chunks }})))")" >> $GITHUB_OUTPUT
+  render:
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    strategy:
+      fail-fast: false
+      matrix:
+        i: ${{ fromJson(needs.plan.outputs.idx) }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash ci/get_blender.sh
+      - run: sudo apt-get install -y -qq libegl1 libegl-mesa0 libgl1-mesa-dri libgbm1 > /dev/null
+      - name: sahne
+        env:
+          REVEAL_KEY: ${{ secrets.REVEAL_KEY }}
+        run: |
+          for k in 1 2 3; do curl -sSfL -o s.enc https://github.com/${{ github.repository }}/releases/download/reveal-assets/reveal3.blend.gz.enc && break; sleep 10; done
+          openssl enc -d -aes-256-cbc -md sha256 -pbkdf2 -iter 100000 -pass env:REVEAL_KEY -in s.enc | gunzip > reveal3.blend
+          rm s.enc; ls -la reveal3.blend
+      - name: render
+        env:
+          ENGINE: ${{ inputs.engine }}
+          RES: ${{ inputs.res }}
+          SAMPLES: ${{ inputs.samples }}
+          EGL_PLATFORM: surfaceless
+        run: blender -b reveal3.blend --python reveal/build4.py -- "$PWD/fr" "${{ inputs.frames }}" "${{ matrix.i }}/${{ inputs.chunks }}" 2>&1 | grep -E "KARE|BITTI|Error|Traceback|rror|Blender [0-9]|GPU|EGL" | head -2000
+      - run: ls fr | wc -l
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: rv-${{ inputs.tag }}-${{ matrix.i }}
+          path: fr
+          compression-level: 0
+  assemble:
+    needs: render
+    if: ${{ always() && inputs.assemble == '1' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: rv-${{ inputs.tag }}-*
+          path: fr
+          merge-multiple: true
+      - run: ls fr | wc -l
+      - run: bash ci/get_blender.sh
+      - name: sarki + font
+        env:
+          REVEAL_KEY: ${{ secrets.REVEAL_KEY }}
+        run: |
+          curl -sSfL -o song.enc https://github.com/${{ github.repository }}/releases/download/reveal-assets/song.mp3.enc
+          openssl enc -d -aes-256-cbc -md sha256 -pbkdf2 -iter 100000 -pass env:REVEAL_KEY -in song.enc > song.mp3
+          curl -sSfL -o f1.ttf https://github.com/google/fonts/raw/main/ofl/barlowcondensed/BarlowCondensed-ExtraBold.ttf
+          curl -sSfL -o f2.ttf https://github.com/google/fonts/raw/main/ofl/barlowcondensed/BarlowCondensed-SemiBold.ttf
+      - env:
+          FONT1: ${{ github.workspace }}/f1.ttf
+          FONT2: ${{ github.workspace }}/f2.ttf
+          RES: ${{ inputs.res }}
+        run: blender -b --factory-startup --python reveal/assemble4.py -- "$PWD/fr" "$PWD/song.mp3" "$PWD/ZAGANOS_robot_reveal_v4.mp4" ${{ inputs.preview }} 2>&1 | grep -E "KARE|VIDEO|ONIZLEME|Error|Traceback"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: video-${{ inputs.tag }}
+          path: ZAGANOS_robot_reveal_v4*
