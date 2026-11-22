@@ -8,7 +8,7 @@
 #  3) El kamerasi titremesi fazla (C_chase, E_strafe, J_go, H_*)           -> kamera yolu yumusatildi (titreme ~%35'e)
 #  4) SHOT BLOCKER cekiminde robot kadrajdan tasiyor (23-25 s)             -> kamera geri cekildi
 #  5) Final: ZAGANOS yazisi robotun ustune biniyor (30-34 s)               -> robot sag uce kaydirildi (lens kaydirma), yazi solda
-#  6) Acilis 0-1 s tamamen siyah, ilk kareler bos                          -> isiklar 15 kare erken aciliyor
+#  6) Acilis 0-1 s siyah: bilerek korundu, ZAGANOS / OVERLORD giris yazisi oraya geliyor (EARLY_LIGHTS=1 eski davranis)
 import bpy, sys, os, math
 
 args = sys.argv[sys.argv.index('--') + 1:]
@@ -84,8 +84,8 @@ pull_back('G_block', 1.35)
 O['I_hero'].data.shift_x = -0.17
 O['I_hero'].data.dof.aperture_fstop = 3.5
 
-# ---- 6) acilis: isiklari 15 kare erken ac (ilk saniye bos kalmasin)
-for o in O:
+# ---- 6) acilis: ilk saniye bilerek karanlik kaliyor (ZAGANOS / OVERLORD giris yazisi oraya geliyor)
+for o in ([] if os.environ.get('EARLY_LIGHTS') != '1' else O):
     if o.type == 'LIGHT' and o.data.animation_data and o.data.animation_data.action:
         for fc in fcurves_of(o.data):
             for kp in fc.keyframe_points:
