@@ -24,7 +24,7 @@ LABELS = [
     ('05', 'GROUND INTAKE',      20.2, 22.3, ICE),
     ('06', 'SHOT BLOCKER',       22.7, 24.8, ICE),
 ]
-FLASHES = [(246, 0.22), (494, 0.22), (850, 0.22)]
+FLASHES = [(43, 0.30), (246, 0.22), (494, 0.22), (850, 0.22)]
 
 sc = bpy.context.scene
 sc.view_settings.view_transform = 'Standard'; sc.view_settings.look = 'None'
@@ -82,10 +82,15 @@ for i, (num, txt, t0, t1, col) in enumerate(LABELS):
     text(f'n{i}', num, f0, f1, 40, 0.055, 0.155, col, f1o, ch); ch += 1
     text(f'l{i}', txt, f0 + 3, f1, 70, 0.055, 0.095, (1, 1, 1), f2o, ch, box=True); ch += 1
 
+# giris: karanlik ilk saniyede takim adi, beat'te (kare 43) robotun adi; robot alt %78'de, yazi ustteki bos alanda
+text('i_team', 'Z  A  Ğ  A  N  O  S', 4, 41, 96, 0.5, 0.54, (1, 1, 1), f1o, ch, align='CENTER', fade=7); ch += 1
+text('i_pres', 'P R E S E N T S', 12, 41, 30, 0.5, 0.455, ICE, f2o, ch, align='CENTER', fade=6); ch += 1
+text('i_robot', 'OVERLORD', 43, 117, 170, 0.5, 0.87, (1, 1, 1), f1o, ch, align='CENTER', fade=4); ch += 1
+
 # final: robot sagda (build4), yazi solda
 t0, t1 = int(30.0 * FPS), END - 2
-text('title', 'ZAĞANOS', t0, t1, 210, 0.065, 0.56, (1, 1, 1), f1o, ch, fade=12); ch += 1
-text('sub', 'FTC #25577   ·   2026–27', t0 + 10, t1, 54, 0.068, 0.425, ICE, f2o, ch, fade=12); ch += 1
+text('title', 'OVERLORD', t0, t1, 210, 0.065, 0.56, (1, 1, 1), f1o, ch, fade=12); ch += 1
+text('sub', 'ZAĞANOS   ·   FTC #25577   ·   2026–27', t0 + 10, t1, 50, 0.068, 0.425, ICE, f2o, ch, fade=12); ch += 1
 
 def color(name, f0, f1, col, blend, keys, chn):
     try:
@@ -98,7 +103,6 @@ def color(name, f0, f1, col, blend, keys, chn):
 
 for i, (fr, k) in enumerate(FLASHES):
     color(f'flash{i}', fr, fr + 7, (1, 1, 1), 'ADD', ((fr, k), (fr + 2, k * 0.6), (fr + 6, 0.0)), ch); ch += 1
-color('fadein', 1, 14, (0, 0, 0), 'ALPHA_OVER', ((1, 1.0), (13, 0.0)), ch); ch += 1
 color('fadeout', END - 20, END + 1, (0, 0, 0), 'ALPHA_OVER', ((END - 20, 0.0), (END, 1.0)), ch); ch += 1
 
 r = sc.render
