@@ -78,7 +78,7 @@ def pull_back(cam_name, k):
             kc.co[1] = t + (kc.co[1] - t) * k
             kc.handle_left[1] = kc.handle_right[1] = kc.co[1]
         cf[i].update()
-pull_back('G_block', 1.35)
+pull_back('G_block', 1.7)
 
 # ---- 5) final: robot kadrajin sagina (yazi sola gelecek)
 O['I_hero'].data.shift_x = -0.17
